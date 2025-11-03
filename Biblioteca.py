@@ -43,15 +43,13 @@ try:
 except:
     web.quit()
 
-    web.find_element(By.XPATH, '//*[@id="pergamum"]/div[2]/div/div[1]/div/div'
-                               '[1]/div/div[2]/div[2]/form/div[1]/div[2]/div').click()
 
 sleep(3)
-if logado(web):
-    print("Você já está logado!")
 
 if not logado(web):
 
+    web.find_element(By.XPATH, '//*[@id="pergamum"]/div[2]/div/div[1]/div/div'
+                               '[1]/div/div[2]/div[2]/form/div[1]/div[2]/div').click()
     WebDriverWait(web,30).until(EC.element_to_be_clickable((By.ID, 'i0116')))
     web.find_element(By.XPATH, '//*[@id="i0116"]').click()
     web.find_element(By.XPATH, '//*[@id="i0116"]').send_keys(email)
