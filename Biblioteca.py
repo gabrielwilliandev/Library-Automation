@@ -116,6 +116,7 @@ if not logado(web):
     except:
         pass
 
+    print("Logado com sucesso!")
 
 WebDriverWait(web, 30).until(EC.element_to_be_clickable((By.XPATH, '//*[@id="content"]/div[4]/div[1]/div/button[1]')))
 web.find_element(By.XPATH, '//*[@id="content"]/div[4]/div[1]/div/button[1]').click()
