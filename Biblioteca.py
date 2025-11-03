@@ -68,17 +68,34 @@ def renovados(foram):
         return "não foram renovados hoje! 😔"
 
 def logado(web):
-    html = web.page_source
-    return "Sair" in html or "Minha Conta" in html or "Dados Pessoais" in html
+    try:
+        WebDriverWait(web, 10).until(
+            EC.presence_of_element_located((By.XPATH, '//*[@id="content"]/div[4]/div[1]/div/button[1]'))
+        )
+        return True
+    except:
+        return False
 
 def pendente(web):
-    livros = web.page_source
-    return "Títulos pendentes" in livros
-
+    try:
+        WebDriverWait(web, 10).until(
+            EC.presence_of_element_located((By.XPATH, '//*[@id="mp-root"]/div/div[1]/div[5]/div/div[2]/div[2]/div/div[1]/div[1]/h5'))
+        )
+        return True
+    except:
+        return False
 
 web = webdriver.Chrome(options = opcoes)
+
+try:
+    web.get(URL)
+except WebDriverException as e:
+    print(f"Erro ao acessar o site: {e}")
+    # Aqui você pode enviar e-mail ou encerrar o script
+    sendemail("não foram possíveis de renovar. O site pode estar fora do ar. 📵")
+    web.quit()
+    exit()
 web.maximize_window()
-web.get(URL)
 
 try:
     element = WebDriverWait(web, 50).until(
@@ -136,7 +153,7 @@ if pendente(web):
                 EC.presence_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
             )
             mensagem = web.find_element(By.CSS_SELECTOR, '[role="alert"]').text
-            if "Renovado com sucesso!" in mensagem.lower():
+            if "renovado com sucesso!" in mensagem.lower():
                 print("Livro renovado!")
                 foram = True
 
