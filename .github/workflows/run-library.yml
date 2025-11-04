@@ -16,8 +16,6 @@ jobs:
       # 1. Iniciar Display Virtual (XVFB)
       - name: Instalar e Iniciar XVFB (Display Virtual)
         uses: coactions/setup-xvfb@v1
-        with:
-          run: start
 
       - name: 🏗️ Configurar Python 3.10
         uses: actions/setup-python@v5

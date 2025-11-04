@@ -218,7 +218,6 @@ except Exception as e:
     web.quit()
     exit()
 
-# --- INÍCIO DO PLANO E: FORÇA BRUTA NO BOTÃO RENOVAR ---
 renovados = []
 nao_renovados = []
 
@@ -228,40 +227,71 @@ try:
     WebDriverWait(web, 45).until(
         EC.presence_of_element_located((By.XPATH, "//button[@title='Renovar']"))
     )
-    print("Pelo menos um botão 'Renovar' foi encontrado no DOM. Coletando todos os botões.")
+    print("Pelo menos um botão 'Renovar' foi encontrado no DOM.")
 
-    # 2. Coleta TODOS os botões de renovação disponíveis
-    botoes = web.find_elements(By.XPATH, "//button[@title='Renovar']")
+    # 2. Descobre QUANTOS livros precisam ser processados (para o loop 'for')
+    # Esta contagem é feita APENAS UMA VEZ
+    botoes_iniciais = web.find_elements(By.XPATH, "//button[@title='Renovar']")
+    num_botoes_inicial = len(botoes_iniciais)
 
-    if not botoes:
+    if num_botoes_inicial == 0:
         raise TimeoutException("Nenhum botão de renovação encontrado após o carregamento.")
 
-    print(f"Encontrados {len(botoes)} livros para tentar renovar.")
+    print(f"Encontrados {num_botoes_inicial} livros para tentar renovar.")
 
-    # 3. Itera e clica usando JavaScript
-    for i, botao in enumerate(botoes):
-        # Fallback para o título, caso não seja extraído
-        titulo = f"Livro {i + 1} (Título não extraído)"
+    # 3. Itera usando um ÍNDICE (de 0 até num_botoes_inicial - 1)
+    #    Isso é CRUCIAL para evitar StaleElementReferenceException
+    for i in range(num_botoes_inicial):
+        print(f"\n--- Processando livro {i + 1} de {num_botoes_inicial} ---")
+        titulo = f"Livro {i + 1} (Título não extraído)"  # Fallback
+
         try:
-            # Tenta pegar o título através de JavaScript, mais robusto no Actions
-            titulo_script = """
-                let row = arguments[0].closest('.row'); // Encontra a div pai da linha
-                if (row) {
-                    let titleSpan = row.querySelector("span[id^='tit-']");
-                    return titleSpan ? titleSpan.textContent.trim() : arguments[1];
-                }
-                return arguments[1];
-            """
-            titulo = web.execute_script(titulo_script, botao, titulo)
+            # 4. A CADA ITERAÇÃO, re-busca TODOS os botões
+            #    Espera curta, pois eles já devem estar lá
+            WebDriverWait(web, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//button[@title='Renovar']"))
+            )
+            # Pausa para estabilização da DOM
+            sleep(2)
+
+            botoes = web.find_elements(By.XPATH, "//button[@title='Renovar']")
+
+            # Validação:
+            if not botoes:
+                print("AVISO: Não há mais botões 'Renovar' para processar. Saindo do loop.")
+                break  # Sai do loop 'for'
+
+            # 5. Pega o PRIMEIRO botão da lista (índice 0)
+            botao_atual = botoes[0]
+
+            # 6. Tenta extrair o título (usando o JS original, que é bom)
+            try:
+                titulo_script = """
+                    let row = arguments[0].closest('.row'); // Encontra a div pai da linha
+                    if (row) {
+                        let titleSpan = row.querySelector("span[id^='tit-']");
+                        return titleSpan ? titleSpan.textContent.trim() : arguments[1];
+                    }
+                    return arguments[1];
+                """
+                # Passa o 'botao_atual' (que é o botoes[0]) para o script
+                titulo_candidato = web.execute_script(titulo_script, botao_atual, "")
+                if titulo_candidato:
+                    titulo = titulo_candidato
+                else:
+                    print(f"Aviso: JS não retornou título para o botão 0. Usando fallback.")
+
+            except Exception as e_js:
+                print(f"Falha ao tentar JS para extrair título: {e_js}. Usando fallback.")
 
             print(f"Tentando renovar o livro: {titulo}")
 
-            # Clica diretamente via JavaScript no botão
-            web.execute_script("arguments[0].scrollIntoView(true);", botao)
+            # 7. Clica no PRIMEIRO botão (índice 0)
+            web.execute_script("arguments[0].scrollIntoView(true);", botao_atual)
             sleep(0.5)
-            web.execute_script("arguments[0].click();", botao)
+            web.execute_script("arguments[0].click();", botao_atual)
 
-            # Espera o alerta estar VISÍVEL
+            # 8. Espera o alerta estar VISÍVEL
             alert_element = WebDriverWait(web, 10).until(
                 EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
             )
@@ -274,13 +304,18 @@ try:
                 print(f"⚠️ Livro '{titulo}' não pôde ser renovado: {mensagem}")
                 nao_renovados.append((titulo, mensagem))
 
-            sleep(1)  # Pausa entre cliques
+            # Pausa extra longa após o clique para a DOM se re-renderizar
+            print("Aguardando 3 segundos para a página atualizar após o clique...")
+            sleep(3)
 
         except Exception as e:
             print(f"❌ Erro ao tentar processar o livro '{titulo}': {e}")
             nao_renovados.append((titulo, f"Erro inesperado no script: {e}"))
+            # Tenta se recuperar e ir para o próximo, pausando
+            sleep(2)
 
-    # Envia o e-mail consolidado
+    # Fim do loop for
+    print("\nTodos os livros foram processados.")
     msg = formatar_email(renovados, nao_renovados)
     sendemail(msg)
 
@@ -290,14 +325,12 @@ except TimeoutException as e:
     print(
         f"Falha crítica: O botão 'Renovar' não apareceu após 45 segundos. Assumindo que não há livros para renovar ou que o site falhou na renderização.")
     sendemail(
-        "Falha crítica ao tentar renovar os livros. O site pode estar extremamente lento ou falhou na renderização.")
+        "Nenhum livro foi processado. O site pode estar extremamente lento ou falhou na renderização (botão 'Renovar' não encontrado).")
 
 except Exception as e:
     # Erro de estrutura ou qualquer outro erro
     print(f"Erro ao tentar processar a página de renovação: {e}")
     sendemail("Erro ao tentar processar a página de renovação. A estrutura do site pode ter mudado.")
-
-# --- FIM DO PLANO E ---
 
 sleep(5)
 print("Processo finalizado!")
