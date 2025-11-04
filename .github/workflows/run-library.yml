@@ -7,7 +7,7 @@ on:
 
 jobs:
   renovar-livros:
-    runs-on: ubuntu-latest # Usa a máquina virtual mais recente do Ubuntu
+    runs-on: windows-latest # Usa a máquina virtual mais recente do Ubuntu
 
     steps:
       - name:  checkout
