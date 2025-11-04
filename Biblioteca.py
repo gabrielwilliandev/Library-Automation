@@ -3,7 +3,7 @@ import emoji
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from selenium import webdriver
-from selenium.common import WebDriverException, StaleElementReferenceException
+from selenium.common import WebDriverException
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
@@ -195,40 +195,25 @@ sleep(3)
 if pendente(web):
     print("Existem títulos pendentes!")
 
+    foram = False
     renovados = []
     nao_renovados = []
+    linhas = web.find_elements(By.XPATH, "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]")
 
-    # Captura a quantidade inicial de linhas com botão de renovação
-    linhas_xpath = "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]"
-    linhas = web.find_elements(By.XPATH, linhas_xpath)
-    total_linhas = len(linhas)
-    print(f"Foram encontradas {total_linhas} linhas com botão de renovação.")
-
-    for i in range(total_linhas):
+    for linha in linhas:
         try:
-            # Recarrega os elementos a cada iteração (para evitar stale references)
-            linhas_atualizadas = web.find_elements(By.XPATH, linhas_xpath)
-            if i >= len(linhas_atualizadas):
-                break  # caso a página tenha mudado e o índice não exista mais
-
-            linha = linhas_atualizadas[i]
-
-            # Pega o título e o botão da linha atual
+            # Pega o título do livro dentro da linha
             titulo = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]").text
+
+            # Pega o botão Renovar dentro da linha
             botao = linha.find_element(By.XPATH, ".//button[@title='Renovar']")
 
             print(f"Tentando renovar o livro: {titulo}")
 
-            # Garante que o botão está visível e clicável
-            web.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao)
-            web.execute_script("window.scrollBy(0, -100);")  # ajusta posição
-            WebDriverWait(web, 10).until(EC.element_to_be_clickable(botao))
-
-            # Clica via JavaScript (mais confiável em headless)
+            web.execute_script("arguments[0].scrollIntoView(true);", botao)
+            sleep(0.5)
             web.execute_script("arguments[0].click();", botao)
-            print(f"🔘 Clique realizado para '{titulo}'")
 
-            # Aguarda o alerta de retorno
             WebDriverWait(web, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
             )
@@ -241,21 +226,18 @@ if pendente(web):
                 print(f"⚠️ Livro '{titulo}' não pôde ser renovado: {mensagem}")
                 nao_renovados.append((titulo, mensagem))
 
-            sleep(1.5)  # pausa entre cliques para estabilidade
+            # Pequena pausa para evitar conflito entre cliques
+            sleep(1)
 
         except Exception as e:
             print(f"❌ Erro ao tentar renovar '{titulo}': {e}")
-            nao_renovados.append((titulo, str(e)))
-            sleep(1)
 
-    # Após o loop, envia o e-mail consolidado
     msg = formatar_email(renovados, nao_renovados)
     sendemail(msg)
 
 else:
     print("Nenhum título pendente!")
     sendemail("Não foram renovados, pois não há títulos pendentes!")
-
 sleep(5)
 print("Processo finalizado!")
 web.quit()
