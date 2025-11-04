@@ -4,7 +4,7 @@ BoBot é um script em **Python** que automatiza a renovação de livros da plata
 
 ---
 
-## Funcionalidades
+## 🚀 Funcionalidades
 
 * ✅ Verifica se existem livros com títulos pendentes
 * ✅ Realiza a renovação automática dos livros
@@ -14,40 +14,41 @@ BoBot é um script em **Python** que automatiza a renovação de livros da plata
 
 ---
 
-## Tecnologias utilizadas
+## 🧰 Tecnologias utilizadas
 
-* Python 3.11+
+* Python 3.10+
 * Selenium
 * dotenv (para gerenciar credenciais)
+* emoji (para logs e e-mails)
 * smtplib / email.mime (para envio de e-mails)
 * GitHub Actions (para execução automática)
 
 ---
 
-## Configuração
+## ⚙️ Configuração
 
 ### Instalar dependências
 
-```
-pip install selenium python-dotenv emoji
+```bash
+pip install selenium python-dotenv emoji webdriver-manager
 ```
 
-### Configurar variáveis de ambiente
+### Configurar variáveis de ambiente (execução local)
 
 Crie um arquivo `.env` na raiz do projeto com:
 
-```
+```bash
 UCB_EMAIL=seu_email@ucb.com.br
 UCB_PASS=sua_senha
 ```
 
-> **Atenção:** Guarde seu e-mail e senha com segurança. As variáveis de ambiente só são utilizadas caso deseje rodar o código no seu dispositivo local. Caso deseje passar para nuvem, é necessário configurar as variáveis no própio Actions, por exemplo.
+> ⚠️ **Atenção:** As credenciais não devem ser versionadas. Se for usar no GitHub Actions, adicione-as como **Secrets** do repositório (`UCB_EMAIL` e `UCB_PASS`).
 
 ---
 
-## Como rodar localmente
+## 💻 Como rodar localmente
 
-```
+```bash
 python Biblioteca.py
 ```
 
@@ -61,70 +62,45 @@ O script realizará as seguintes ações:
 
 ---
 
-## Execução via GitHub Actions
+## ☁️ Execução via GitHub Actions
 
-O script pode ser automatizado diariamente usando GitHub Actions. Um workflow típico (`.github/workflows/renovacao.yml`) inclui:
+O script pode ser automatizado diariamente usando **GitHub Actions**. Um workflow funcional (`.github/workflows/renovacao.yml`)
 
-```
-name: Renovação Pergamum
-
-on:
-  schedule:
-    - cron: '0 8 * * *' # todos os dias às 8h
-  workflow_dispatch:
-
-jobs:
-  renovacao:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Configurar Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - name: Instalar dependências
-        run: pip install selenium python-dotenv emoji
-      - name: Executar script
-        run: python Biblioteca.py
-        env:
-          UCB_EMAIL: ${{ secrets.UCB_EMAIL }}
-          UCB_PASS: ${{ secrets.UCB_PASS }}
-```
-
-> **Nota:** As credenciais devem ser adicionadas como **Secrets** do repositório no GitHub, evitando expor login e senha.
+> 🕒 O GitHub Actions usa fuso **UTC**, então o cron `0 20 * * *` executa às **17:00 de Brasília**.
 
 ---
 
-## Estrutura do projeto
+## 🧱 Estrutura do projeto
 
-```
+```plaintext
 .
-├── Biblioteca.py      # Script principal
-├── .env               # Credenciais (não subir para o repositório)
-├── README.md          # Este arquivo
-└── requirements.txt   # Dependências opcionais
+├── Biblioteca.py        # Script principal
+├── .env                 # Credenciais (não subir para o repositório)
+├── README.md            # Este arquivo
+└── .github/workflows/   # Workflow do GitHub Actions
 ```
 
 ---
 
-## Possíveis mensagens e tratamento
+## 🧾 Logs e mensagens possíveis
 
-* `Nenhum Título pendente!` → Não há livros para renovar
-* `Livro renovado!` → Renovação bem-sucedida
-* `Erro ao tentar renovar` → Problema durante a renovação (ex.: limite de renovações)
-* `Erro ao acessar o site` → O site pode estar fora do ar ou houve problema de conexão
-
----
-
-## Observações
-
-* O script funciona em **modo headless**, então não é necessário abrir o navegador
-* Certifique-se de que o **ChromeDriver** esteja compatível com a versão do seu Chrome
-* É recomendado rodar via **GitHub Actions** para automação diária sem precisar de intervenção manual
+* `Nenhum título pendente encontrado` → Nenhum livro disponível para renovação
+* `Livro renovado com sucesso` → Renovação concluída com êxito
+* `Não foi possível renovar` → O limite de renovações pode ter sido atingido
+* `Erro de login` → Credenciais incorretas ou instabilidade do site
 
 ---
 
-## Contato
+## 💡 Dicas e observações
 
-Desenvolvido por Gabriel Willian 🤖
-Qualquer dúvida ou sugestão, abra uma issue no repositório.
+* O script roda em **modo headless**, sem interface gráfica.
+* No GitHub Actions, o Chrome é instalado automaticamente.
+* O idioma e tamanho da janela são configurados via opções `--lang=pt-BR` e `--window-size=1920,1080`.
+* Utilize `webdriver-manager` para garantir compatibilidade entre Chrome e ChromeDriver.
+* A UCB exige renovação constante da senha do email universitário, ao atualizar a senha, atualize a senha nos Secrets ou no .env.
+---
+
+## 👨‍💻 Autor
+
+Desenvolvido por **Gabriel Willian** 🤖
+Sugestões e melhorias são bem-vindas! Abra uma *issue* no repositório ou envie um *pull request*.
