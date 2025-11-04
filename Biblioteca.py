@@ -30,7 +30,6 @@ opcoes.add_argument("--no-sandbox")
 opcoes.add_argument("--disable-dev-shm-usage")
 opcoes.add_argument("--disable-gpu")
 opcoes.add_argument("--headless=new")
-opcoes.add_argument('--lang=pt-BR')
 
 # --- FIM DAS OPÇÕES ANTI-BOT ---
 
@@ -252,7 +251,7 @@ try:
 
     print("Iniciando processamento de títulos...")
     LINHAS_XPATH = "//span[starts-with(@id, 'tit-')]"  # cada livro visível
-    BOTOES_XPATH = "//button[@title='Renovar']"  # todos os botões de renovação
+    BOTOES_XPATH = "//button[@title='Renew']"  # todos os botões de renovação
 
     titulos = web.find_elements(By.XPATH, LINHAS_XPATH)
     botoes = web.find_elements(By.XPATH, BOTOES_XPATH)
