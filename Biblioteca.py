@@ -14,14 +14,11 @@ import os
 from dotenv import load_dotenv
 import random
 
-# --- OPÇÕES ANTI-BOT ---
 opcoes = webdriver.ChromeOptions()
 
-# 1. Adiciona um User-Agent "humano"
 opcoes.add_argument(
     "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 
-# 2. Desativa a flag "navigator.webdriver"
 opcoes.add_experimental_option("excludeSwitches", ["enable-automation"])
 opcoes.add_experimental_option("useAutomationExtension", False)
 
@@ -31,7 +28,6 @@ opcoes.add_argument("--disable-dev-shm-usage")
 opcoes.add_argument("--disable-gpu")
 opcoes.add_argument("--headless=new")
 
-# --- FIM DAS OPÇÕES ANTI-BOT ---
 
 load_dotenv()
 
@@ -121,7 +117,6 @@ def logado(web):
         return False
 
 
-# --- INÍCIO DO FLUXO PRINCIPAL ---
 web = webdriver.Chrome(options=opcoes)
 web.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 print("WebDriver iniciado e configurações anti-bot aplicadas.")
@@ -215,39 +210,18 @@ except Exception as e:
 renovados = []
 nao_renovados = []
 
-# --- INÍCIO DO BLOCO DE PROCESSAMENTO DE EMPRÉSTIMOS ---
 try:
     SPINNER_XPATH = "(//div[@class='tabela'])[1]//div[@role='status']"
-    print("Aguardando o carregamento da lista de 'Títulos pendentes' (max 30s)...")
+    print("Aguardando o carregamento da lista de 'Títulos pendentes'")
 
     try:
         WebDriverWait(web, 30).until(EC.invisibility_of_element_located((By.XPATH, SPINNER_XPATH)))
         print("Carregamento da lista de empréstimos finalizado.")
     except TimeoutException:
         print("ERRO DE CARREGAMENTO: O spinner não desapareceu após 30s.")
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        screenshot_file = f'debug_emprestimos_FALHA_{timestamp}.png'
-        html_file = f'debug_emprestimos_FALHA_{timestamp}.html'
-        web.save_screenshot(screenshot_file)
-        with open(html_file, 'w', encoding='utf-8') as f:
-            f.write(web.page_source)
         sendemail("Não foi possível carregar a lista de empréstimos no tempo limite (Provável bloqueio de Bot).")
         web.quit()
         exit()
-
-    print("DEBUG: Salvando snapshot da página de empréstimos...")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    screenshot_file = f'debug_emprestimos_{timestamp}.png'
-    html_file = f'debug_emprestimos_{timestamp}.html'
-
-    S = lambda X: web.execute_script('return document.body.parentNode.scroll' + X)
-    web.set_window_size(S('Width'), S('Height'))
-    web.find_element(By.TAG_NAME, 'body').screenshot(screenshot_file)
-    with open(html_file, 'w', encoding='utf-8') as f:
-        f.write(web.page_source)
-    print(f"DEBUG: Screenshot (FULL PAGE) salvo em '{screenshot_file}'")
-    print(f"DEBUG: HTML salvo em '{html_file}'")
-    print("--- FIM DO DEBUG ---")
 
     print("Iniciando processamento de títulos...")
     LINHAS_XPATH = "//span[starts-with(@id, 'tit-')]"  # cada livro visível
