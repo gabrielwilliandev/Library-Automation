@@ -13,22 +13,29 @@ jobs:
       - name:  checkout
         uses: actions/checkout@v4
 
-      # O PASSO DO XVFB FOI REMOVIDO DAQUI
-
       - name: 🏗️ Configurar Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+
+      # NOVO: Instala o Node.js para podermos usar o 'npx'
+      - name: 🏗️ Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Versão LTS estável
 
       - name: 📦 Instalar dependências do Python
         run: |
           python -m pip install --upgrade pip
           pip install selenium python-dotenv emoji
 
-      - name: Instalar Google Chrome (via Playwright)
-        uses: microsoft/playwright-github-action@v1
-        with:
-          browser: chromium
+      # CORREÇÃO: Nova forma de instalar o Chrome
+      - name: 📦 Instalar Google Chrome (via Playwright)
+        run: |
+          # Instala o pacote 'playwright' do node
+          npm install playwright 
+          # Roda o comando recomendado para instalar o Chrome e suas dependências
+          npx playwright install --with-deps chromium
 
       - name: 🚀 Executar script de renovação
         env:
