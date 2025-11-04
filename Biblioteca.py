@@ -13,7 +13,6 @@ from time import sleep
 import os
 from dotenv import load_dotenv
 
-
 opcoes = webdriver.ChromeOptions()
 
 opcoes.add_argument("--window-size=1920,1080")
@@ -27,19 +26,17 @@ email = os.getenv("UCB_EMAIL")
 password = os.getenv("UCB_PASS")
 
 MEU_PERGAMUM = 'https://ucb.pergamum.com.br/meupergamum'
-
 URL = 'https://ucb.pergamum.com.br/login?redirect=%2F'
+
 
 def nome() -> str:
     usuario = os.getenv("UCB_EMAIL").split("@")[0]
-
     partes = usuario.split(".")
-
     nome = " ".join(p.capitalize() for p in partes)
     return nome
 
-def sendemail(msg):
 
+def sendemail(msg):
     smtp_server = "smtp.office365.com"
     port = 587
     remetente = os.getenv("UCB_EMAIL")
@@ -49,7 +46,7 @@ def sendemail(msg):
     email_envio = MIMEMultipart()
     email_envio["From"] = os.getenv("UCB_EMAIL")
     email_envio["To"] = os.getenv("UCB_EMAIL")
-    email_envio["Subject"] = emoji.emojize(":books: Renovação Livros - {} :books:".format(hoje))
+    email_envio["Subject"] = emoji.emojize(f":books: Renovação Livros - {hoje} :books:")
 
     corpo = f"""  
     <p>{msg}</p>
@@ -69,6 +66,7 @@ def sendemail(msg):
         print("E-mail enviado com sucesso!")
     except Exception as e:
         print(f"Erro ao enviar e-mail: {e}")
+
 
 def formatar_email(renovados, nao_renovados):
     html = f"""
@@ -97,8 +95,8 @@ def formatar_email(renovados, nao_renovados):
     </body>
     </html>
     """
-
     return html
+
 
 def logado(web):
     try:
@@ -109,136 +107,164 @@ def logado(web):
     except:
         return False
 
-def pendente(web):
-    try:
-        WebDriverWait(web, 10).until(
-            EC.presence_of_element_located((By.XPATH, '//*[@id="mp-root"]/div/div[1]/div[5]/div/div[2]/div[2]/div/div[1]/div[1]/h5'))
-        )
-        return True
-    except:
-        return False
 
-web = webdriver.Chrome(options = opcoes)
+web = webdriver.Chrome(options=opcoes)
+print("WebDriver iniciado.")
 
 try:
     web.get(URL)
+    print("Página de login aberta.")
 except WebDriverException as e:
     print(f"Erro ao acessar o site: {e}")
-    # Aqui você pode enviar e-mail ou encerrar o script
     sendemail("não foram possíveis de renovar. O site pode estar fora do ar. 📵")
     web.quit()
     exit()
-web.maximize_window()
 
 try:
-    element = WebDriverWait(web, 50).until(
-        EC.element_to_be_clickable((By.XPATH, '//*[@id="pergamum"]/div[2]/div/div[1]/div/div'
-                                              '[1]/div/div[2]/div[2]/form/div[1]/div[2]/div'))
+    WebDriverWait(web, 30).until(
+        EC.presence_of_element_located((By.TAG_NAME, 'body'))
     )
-except:
-    web.quit()
-
-
-sleep(3)
-
-try:
-    WebDriverWait(web, 5).until_not(
-        EC.presence_of_element_located((By.CSS_SELECTOR, '.vp-pop-up'))
-    )
-except:
-    # Caso continue visível, remove via JavaScript
-    web.execute_script("""
-        const pop = document.querySelector('.vp-pop-up');
-        if (pop) pop.remove();
-    """)
-
-# 🔹 Agora sim, pode clicar com segurança
-try:
-    elemento_login = web.find_element(By.XPATH, '//*[@id="pergamum"]/div[2]/div/div[1]/div/div'
-                                                '[1]/div/div[2]/div[2]/form/div[1]/div[2]/div')
-    web.execute_script("arguments[0].scrollIntoView(true);", elemento_login)
-    elemento_login.click()
-    print("Clique inicial realizado com sucesso!")
-except Exception as e:
-    print(f"Erro ao clicar no botão inicial: {e}")
-
-if logado(web):
-    print("Logado!")
-
-if not logado(web):
-
-    WebDriverWait(web,30).until(EC.element_to_be_clickable((By.ID, 'i0116')))
-    web.find_element(By.XPATH, '//*[@id="i0116"]').click()
-    web.find_element(By.XPATH, '//*[@id="i0116"]').send_keys(email)
-    sleep(3)
-    web.find_element(By.XPATH, '//*[@id="i0116"]').send_keys(Keys.ENTER)
-    sleep(3)
-    web.find_element(By.XPATH, '//*[@id="i0118"]').send_keys(password)
-    web.find_element(By.XPATH, '//*[@id="i0118"]').send_keys(Keys.ENTER)
-    sleep(3)
 
     try:
-        WebDriverWait(web, 30).until(
+        WebDriverWait(web, 5).until_not(
+            EC.presence_of_element_located((By.CSS_SELECTOR, '.vp-pop-up'))
+        )
+    except:
+        print("Popup de vídeo ainda visível, removendo com JS...")
+        web.execute_script("""
+            const pop = document.querySelector('.vp-pop-up');
+            if (pop) pop.remove();
+        """)
+
+    elemento_login = WebDriverWait(web, 30).until(
+        EC.element_to_be_clickable(
+            (By.XPATH, '//*[@id="pergamum"]/div[2]/div/div[1]/div/div[1]/div/div[2]/div[2]/form/div[1]/div[2]/div'))
+    )
+    web.execute_script("arguments[0].scrollIntoView(true);", elemento_login)
+    elemento_login.click()
+    print("Clique no botão 'Comunidade Acadêmica' realizado.")
+
+except Exception as e:
+    print(f"Erro ao tentar clicar no botão de login inicial: {e}")
+    sendemail(f"Falha no login inicial: {e}")
+    web.quit()
+    exit()
+
+if not logado(web):
+    print("Iniciando fluxo de login da Microsoft...")
+    try:
+        email_input = WebDriverWait(web, 30).until(
+            EC.element_to_be_clickable((By.ID, 'i0116'))
+        )
+        email_input.click()
+        email_input.send_keys(email)
+        email_input.send_keys(Keys.ENTER)
+        print("E-mail inserido.")
+
+        pass_input = WebDriverWait(web, 30).until(
+            EC.element_to_be_clickable((By.ID, 'i0118'))
+        )
+        sign_in_button = WebDriverWait(web, 30).until(
             EC.element_to_be_clickable((By.ID, 'idSIButton9'))
         )
-        web.find_element(By.ID, 'idSIButton9').click()
-    except:
-        pass
 
-    print("Logado com sucesso!")
+        pass_input.send_keys(password)
+        print("Senha inserida.")
 
-WebDriverWait(web, 30).until(EC.element_to_be_clickable((By.XPATH, '//*[@id="content"]/div[4]/div[1]/div/button[1]')))
-web.find_element(By.XPATH, '//*[@id="content"]/div[4]/div[1]/div/button[1]').click()
+        sign_in_button.click()
 
-web.get(MEU_PERGAMUM)
-sleep(3)
-if pendente(web):
-    print("Existem títulos pendentes!")
+        print("Aguardando navegação da página de senha...")
+        WebDriverWait(web, 10).until(
+            EC.staleness_of(sign_in_button)
+        )
+        print("Página de senha navegou com sucesso.")
 
-    foram = False
-    renovados = []
-    nao_renovados = []
+        print("Procurando botão 'Sim' (Manter conectado)...")
+        WebDriverWait(web, 30).until(
+            EC.element_to_be_clickable((By.ID, 'idSIButton9'))
+        ).click()
+        print("Login Microsoft finalizado.")
+
+    except Exception as e:
+        print(f"Erro durante o fluxo de login da Microsoft: {e}")
+        sendemail(f"Falha ao tentar logar na conta Microsoft: {e}")
+        web.quit()
+        exit()
+else:
+    print("Já estava logado.")
+
+try:
+    WebDriverWait(web, 30).until(
+        EC.element_to_be_clickable((By.XPATH, '//*[@id="content"]/div[4]/div[1]/div/button[1]'))
+    ).click()
+    print("Redirecionado para a página 'Meu Pergamum'.")
+except Exception as e:
+    print(f"Erro ao clicar no botão 'Empréstimos' após o login: {e}")
+    sendemail(f"Falha ao navegar para a área 'Meu Pergamum': {e}")
+    web.quit()
+    exit()
+
+renovados = []
+nao_renovados = []
+
+try:
+    WebDriverWait(web, 30).until(
+        EC.presence_of_element_located((By.XPATH, "//div[@class='tabela']"))
+    )
+    print("Página de pendências carregada. Procurando livros...")
+
     linhas = web.find_elements(By.XPATH, "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]")
 
-    for linha in linhas:
-        try:
-            # Pega o título do livro dentro da linha
-            titulo = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]").text
+    if not linhas:
+        print("Nenhum título pendente encontrado para renovação.")
+        sendemail("Não foram renovados, pois não há títulos pendentes!")
+    else:
+        print(f"Encontrados {len(linhas)} livros para tentar renovar.")
 
-            # Pega o botão Renovar dentro da linha
-            botao = linha.find_element(By.XPATH, ".//button[@title='Renovar']")
+        for linha in linhas:
+            titulo = "Título desconhecido"
+            try:
+                titulo_element = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]")
+                titulo = titulo_element.get_attribute("textContent")
 
-            print(f"Tentando renovar o livro: {titulo}")
+                if titulo:
+                    titulo = titulo.strip()
+                if not titulo:
+                    titulo = titulo_element.text.strip()
 
-            web.execute_script("arguments[0].scrollIntoView(true);", botao)
-            sleep(0.5)
-            web.execute_script("arguments[0].click();", botao)
+                botao = linha.find_element(By.XPATH, ".//button[@title='Renovar']")
 
-            WebDriverWait(web, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
-            )
-            mensagem = web.find_element(By.CSS_SELECTOR, '[role="alert"]').text
+                print(f"Tentando renovar o livro: {titulo}")
 
-            if "renovado com sucesso" in mensagem.lower():
-                print(f"✅ Livro '{titulo}' renovado com sucesso!")
-                renovados.append(titulo)
-            else:
-                print(f"⚠️ Livro '{titulo}' não pôde ser renovado: {mensagem}")
-                nao_renovados.append((titulo, mensagem))
+                web.execute_script("arguments[0].scrollIntoView(true);", botao)
+                sleep(0.5)
+                web.execute_script("arguments[0].click();", botao)
 
-            # Pequena pausa para evitar conflito entre cliques
-            sleep(1)
+                alert_element = WebDriverWait(web, 10).until(
+                    EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
+                )
+                mensagem = alert_element.text
 
-        except Exception as e:
-            print(f"❌ Erro ao tentar renovar '{titulo}': {e}")
+                if "renovado com sucesso" in mensagem.lower():
+                    print(f"✅ Livro '{titulo}' renovado com sucesso!")
+                    renovados.append(titulo)
+                else:
+                    print(f"⚠️ Livro '{titulo}' não pôde ser renovado: {mensagem}")
+                    nao_renovados.append((titulo, mensagem))
 
-    msg = formatar_email(renovados, nao_renovados)
-    sendemail(msg)
+                sleep(1)
 
-else:
-    print("Nenhum título pendente!")
-    sendemail("Não foram renovados, pois não há títulos pendentes!")
+            except Exception as e:
+                print(f"❌ Erro ao tentar processar o livro '{titulo}': {e}")
+                nao_renovados.append((titulo, f"Erro inesperado no script: {e}"))
+
+        msg = formatar_email(renovados, nao_renovados)
+        sendemail(msg)
+
+except Exception as e:
+    print(f"Não foi possível localizar a tabela de pendências (ou não há pendentes): {e}")
+    sendemail("Não foi possível carregar a página de pendências ou não há títulos pendentes.")
+
 sleep(5)
 print("Processo finalizado!")
 web.quit()
-

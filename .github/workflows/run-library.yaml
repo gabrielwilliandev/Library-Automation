@@ -1,8 +1,0 @@
-services:
-  - type: cron
-    name: biblioteca-renovacao
-    env: python
-    plan: free
-    schedule: "0 11 * * *"  # Executa todos os dias às 8h da manhã (horário de Brasília)
-    buildCommand: ""
-    startCommand: python Biblioteca.py

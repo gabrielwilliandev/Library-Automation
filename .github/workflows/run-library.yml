@@ -1,0 +1,38 @@
+name: 📚 Renovação Automática de Livros
+
+on:
+  workflow_dispatch: # Permite rodar manualmente pela aba "Actions"
+  schedule:
+    - cron: '0 15 * * *'
+
+jobs:
+  renovar-livros:
+    runs-on: ubuntu-latest # Usa a máquina virtual mais recente do Ubuntu
+
+    steps:
+      - name:  checkout
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Configurar Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 📦 Instalar dependências do Python
+        run: |
+          python -m pip install --upgrade pip
+          # Instala as bibliotecas que seu script usa
+          pip install selenium python-dotenv emoji
+          # Se você tiver um requirements.txt, mude para:
+          # pip install -r requirements.txt
+
+      - name: 🌐 Configurar Google Chrome
+        # Esta Ação instala o Google Chrome e o ChromeDriver no runner
+        uses: browser-actions/setup-chrome@latest
+
+      - name: 🚀 Executar script de renovação
+        env:
+          # Puxa os segredos que você configurou no repositório
+          UCB_EMAIL: ${{ secrets.UCB_EMAIL }}
+          UCB_PASS: ${{ secrets.UCB_PASS }}
+        run: python Biblioteca.py
