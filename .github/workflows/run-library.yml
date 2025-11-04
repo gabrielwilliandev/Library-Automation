@@ -13,10 +13,11 @@ jobs:
       - name:  checkout
         uses: actions/checkout@v4
 
+      # 1. Iniciar Display Virtual (XVFB)
       - name: Instalar e Iniciar XVFB (Display Virtual)
         uses: coactions/setup-xvfb@v1
         with:
-          run: start  # <-- CORREÇÃO: Define o input 'run' para iniciar o display
+          run: start
 
       - name: 🏗️ Configurar Python 3.10
         uses: actions/setup-python@v5
@@ -28,14 +29,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install selenium python-dotenv emoji
 
+      # 2. Configuração de Navegador Robusta (Playwright)
+      # CORREÇÃO AQUI: Tag alterada para @v1
       - name: Instalar Google Chrome (via Playwright)
-        uses: microsoft/playwright-github-action@v1.0
+        uses: microsoft/playwright-github-action@v1 # <-- CORREÇÃO
         with:
-          browser: chromium # Chromium é o motor do Chrome
+          browser: chromium
 
       - name: 🚀 Executar script de renovação
         env:
           UCB_EMAIL: ${{ secrets.UCB_EMAIL }}
           UCB_PASS: ${{ secrets.UCB_PASS }}
-        # Lembre-se de usar a última versão do Biblioteca.py (Plano E - Força Bruta)
         run: python Biblioteca.py
