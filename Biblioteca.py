@@ -19,7 +19,9 @@ opcoes.add_argument("--window-size=1920,1080")
 opcoes.add_argument("--no-sandbox")
 opcoes.add_argument("--disable-dev-shm-usage")
 opcoes.add_argument("--disable-gpu")
-opcoes.add_argument("--headless=new")
+#opcoes.add_argument("--headless=new")
+opcoes.add_argument('--disable-blink-features=AutomationControlled')
+
 
 # --- PLANO C: User-Agent para melhorar a compatibilidade e renderização ---
 opcoes.add_argument(
@@ -248,8 +250,8 @@ try:
         try:
             # 4. A CADA ITERAÇÃO, re-busca TODOS os botões
             #    Espera curta, pois eles já devem estar lá
-            WebDriverWait(web, 10).until(
-                EC.presence_of_element_located((By.XPATH, "//button[@title='Renovar']"))
+            WebDriverWait(web, 45).until(
+                EC.visibility_of_element_located((By.XPATH, "//button[@title='Renovar']"))
             )
             # Pausa para estabilização da DOM
             sleep(2)
@@ -324,9 +326,18 @@ except TimeoutException as e:
     # Se o botão não aparecer após 45s
     print(
         f"Falha crítica: O botão 'Renovar' não apareceu após 45 segundos. Assumindo que não há livros para renovar ou que o site falhou na renderização.")
-    sendemail(
-        "Nenhum livro foi processado. O site pode estar extremamente lento ou falhou na renderização (botão 'Renovar' não encontrado).")
 
+    # --- DEBUG ---
+    print("Salvando screenshot da falha em 'debug_screenshot.png'...")
+    web.save_screenshot('debug_screenshot.png')
+
+    print("Salvando fonte da página em 'debug_page.html'...")
+    with open('debug_page.html', 'w', encoding='utf-8') as f:
+        f.write(web.page_source)
+    # -------------
+
+    sendemail(
+        "Falha crítica ao tentar renovar os livros. O site pode estar extremamente lento ou falhou na renderização (botão 'Renovar' não encontrado).")
 except Exception as e:
     # Erro de estrutura ou qualquer outro erro
     print(f"Erro ao tentar processar a página de renovação: {e}")
