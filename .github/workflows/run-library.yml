@@ -2,7 +2,7 @@ name: Rodar Biblioteca Bot Diário
 
 on:
   schedule:
-    - cron: "10 15 * * *"  # ⏰ 12h UTC → 9h Brasília
+    - cron: "0 15 * * *"  # ⏰ 12h UTC → 9h Brasília
   workflow_dispatch:        # Permite rodar manualmente
 
 jobs:

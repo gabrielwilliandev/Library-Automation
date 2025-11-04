@@ -3,6 +3,7 @@ import emoji
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from selenium import webdriver
+from selenium.common import WebDriverException, StaleElementReferenceException
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
@@ -14,7 +15,7 @@ from dotenv import load_dotenv
 
 
 opcoes = webdriver.ChromeOptions()
-opcoes.add_argument('--headless=new')
+#opcoes.add_argument('--headless=new')
 load_dotenv()
 
 email = os.getenv("UCB_EMAIL")
@@ -46,10 +47,13 @@ def sendemail(msg):
     email_envio["Subject"] = emoji.emojize(":books: Renovação Livros - {} :books:".format(hoje))
 
     corpo = f"""  
-    <p>Olá, {nome()}! 😄</p>
-
-    <p>Os seus livros {msg} </p>
-    <p>At.te, BoBot 🤖 | {hoje}! </p>
+    <p>{msg}</p>
+    <hr style="border:none; border-top:1px solid #ddd; margin:20px 0;">
+    <p style="font-size:14px; color:#777;">
+    At.te,<br>
+    <b>BoBot 🤖 | {hoje}</b><br>
+    Create by Gabriel Willian
+    </p>
     """
     email_envio.attach(MIMEText(corpo, "html"))
     try:
@@ -61,11 +65,35 @@ def sendemail(msg):
     except Exception as e:
         print(f"Erro ao enviar e-mail: {e}")
 
-def renovados(foram):
-    if foram:
-        return "foram renovados hoje! 😁"
+def formatar_email(renovados, nao_renovados):
+    html = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333;">
+    <h2>Olá, {nome()}! 😄</h2>
+    <h2>📚 Relatório de Renovação de Livros | UCB</h2>
+    """
+
+    if renovados:
+        html += "<h3 style='color:green;'>✅ Livros renovados hoje:</h3><ul>"
+        for t in renovados:
+            html += f"<li>{t} 📗</li>"
+        html += "</ul>"
     else:
-        return "não foram renovados hoje! 😔"
+        html += "<p>⚠️ Nenhum livro foi renovado hoje!</p>"
+
+    if nao_renovados:
+        html += "<h3 style='color:red;'>❌ Não renovados:</h3><ul>"
+        for t, motivo in nao_renovados:
+            html += f"<li><b>{t}</b> — {motivo}</li>"
+        html += "</ul>"
+
+    html += """
+    <p>📅 Processo finalizado automaticamente.</p>
+    </body>
+    </html>
+    """
+
+    return html
 
 def logado(web):
     try:
@@ -143,32 +171,48 @@ sleep(3)
 if pendente(web):
     print("Existem títulos pendentes!")
 
-    botoes = web.find_elements(By.XPATH, "//button[@title='Renovar']")
     foram = False
+    renovados = []
+    nao_renovados = []
+    linhas = web.find_elements(By.XPATH, "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]")
 
-    for botao in botoes:
+    for linha in linhas:
         try:
+            # Pega o título do livro dentro da linha
+            titulo = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]").text
+
+            # Pega o botão Renovar dentro da linha
+            botao = linha.find_element(By.XPATH, ".//button[@title='Renovar']")
+
+            print(f"Tentando renovar o livro: {titulo}")
+
+            web.execute_script("arguments[0].scrollIntoView(true);", botao)
             botao.click()
-            WebDriverWait(web, 15).until(
+
+            WebDriverWait(web, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
             )
             mensagem = web.find_element(By.CSS_SELECTOR, '[role="alert"]').text
-            if "renovado com sucesso!" in mensagem.lower():
-                print("Livro renovado!")
-                foram = True
 
+            if "renovado com sucesso" in mensagem.lower():
+                print(f"✅ Livro '{titulo}' renovado com sucesso!")
+                renovados.append(titulo)
             else:
-                print("Livro não pôde ser renvoado hoje!")
+                print(f"⚠️ Livro '{titulo}' não pôde ser renovado: {mensagem}")
+                nao_renovados.append((titulo, mensagem))
+
+            # Pequena pausa para evitar conflito entre cliques
+            sleep(1)
+
         except Exception as e:
-            print(f"Erro ao tentar renovar: {e}")
-            foram = False
-    msg = renovados(foram)
+            print(f"❌ Erro ao tentar renovar '{titulo}': {e}")
+
+    msg = formatar_email(renovados, nao_renovados)
     sendemail(msg)
 
 else:
-    print("Nenhum Título pendente!")
+    print("Nenhum título pendente!")
     sendemail("Não foram renovados, pois não há títulos pendentes!")
-
 sleep(5)
 print("Processo finalizado!")
 web.quit()
