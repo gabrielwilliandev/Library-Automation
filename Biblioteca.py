@@ -214,32 +214,33 @@ try:
     )
     print("Página de pendências carregada. Tentando localizar livros...")
 
-    # 2. Tenta esperar explicitamente pela primeira linha de livro com o botão 'Renovar'
+    # 2. **A MUDANÇA MAIS IMPORTANTE:** Espera 20 segundos pela primeira linha de livro
+    # Se a tabela não carregar, ela falhará aqui.
     try:
-        WebDriverWait(web, 10).until(
+        WebDriverWait(web, 20).until(
             EC.presence_of_element_located(
                 (By.XPATH, "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]"))
         )
         print("Pelo menos um livro com botão 'Renovar' foi encontrado. Coletando todos os livros.")
     except:
-        # Se falhar após 10 segundos, a tabela provavelmente não tem livros para renovar (o que pode ser o caso)
-        print("Nenhuma linha de livro com botão 'Renovar' foi encontrada (Pode estar vazia ou a renderização demorou).")
+        print(
+            "Nenhuma linha de livro com botão 'Renovar' foi encontrada após 20s. Assumindo que não há livros pendentes ou que a renderização falhou.")
+        # Se cair aqui, a lista 'linhas' abaixo será vazia, e o script seguirá normalmente.
         pass
 
-    # 3. Coleta os elementos, que agora devem estar totalmente carregados (ou será uma lista vazia)
+        # 3. Coleta os elementos. Se a espera acima falhou, a lista 'linhas' estará vazia.
     linhas = web.find_elements(By.XPATH, "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]")
 
     if not linhas:
         print("Nenhum título pendente encontrado para renovação.")
+        # Se o e-mail não foi enviado antes, ele será enviado aqui
         sendemail("Não foram renovados, pois não há títulos pendentes!")
     else:
         print(f"Encontrados {len(linhas)} livros para tentar renovar.")
 
         for linha in linhas:
-            # ... (o loop de renovação aqui, que já está funcionando) ...
             titulo = "Título desconhecido"
             try:
-                # ... (resto do seu loop de renovação, garantindo a correção do .textContent) ...
                 titulo_element = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]")
 
                 titulo = titulo_element.get_attribute("textContent")
@@ -278,6 +279,7 @@ try:
         sendemail(msg)
 
 except Exception as e:
+    # Se a tabela não carregar em 30s, ou der timeout, entra aqui.
     print(f"Não foi possível localizar a tabela de pendências (ou não há pendentes): {e}")
     sendemail("Não foi possível carregar a página de pendências ou não há títulos pendentes.")
 
