@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 
 
 opcoes = webdriver.ChromeOptions()
-#opcoes.add_argument('--headless=new')
+opcoes.add_argument('--headless=new')
 load_dotenv()
 
 email = os.getenv("UCB_EMAIL")
