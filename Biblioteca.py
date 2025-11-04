@@ -30,6 +30,7 @@ opcoes.add_argument("--no-sandbox")
 opcoes.add_argument("--disable-dev-shm-usage")
 opcoes.add_argument("--disable-gpu")
 opcoes.add_argument("--headless=new")
+options.add_argument('--lang=pt-BR')
 
 # --- FIM DAS OPÇÕES ANTI-BOT ---
 
