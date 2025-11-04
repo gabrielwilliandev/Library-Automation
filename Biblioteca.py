@@ -15,12 +15,24 @@ from dotenv import load_dotenv
 
 opcoes = webdriver.ChromeOptions()
 
+opcoes.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+
+opcoes.add_experimental_option("excludeSwitches", ["enable-automation"])
+opcoes.add_experimental_option("useAutomationExtension", False)
+
 opcoes.add_argument("--window-size=1920,1080")
 opcoes.add_argument("--no-sandbox")
 opcoes.add_argument("--disable-dev-shm-usage")
 opcoes.add_argument("--disable-gpu")
 opcoes.add_argument("--headless=new")
+
 load_dotenv()
+
+# ... (restante do seu script) ...
+
+web = webdriver.Chrome(options=opcoes)
+# Adiciona um script para remover a propriedade 'webdriver' após a inicialização, garantindo que ela suma.
+web.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
 email = os.getenv("UCB_EMAIL")
 password = os.getenv("UCB_PASS")
@@ -109,7 +121,6 @@ def logado(web):
         return False
 
 
-web = webdriver.Chrome(options=opcoes)
 print("WebDriver iniciado.")
 
 try:
@@ -212,8 +223,7 @@ renovados = []
 nao_renovados = []
 
 try:
-    # --- 1. ESPERA CORRIGIDA (AGORA VEM PRIMEIRO!) ---
-    # Espera até que o PRIMEIRO botão de renovação esteja visível, garantindo que os dados carregaram.
+    # 1. ESPERA CORRIGIDA (AINDA VAI FALHAR AQUI)
     XPATH_PRIMEIRO_BOTAO = "//div[@class='tabela']//div[@class='row']//button[@title='Renovar']"
     print("Aguardando o carregamento dos empréstimos e dos botões de renovação...")
 
@@ -221,7 +231,6 @@ try:
         EC.visibility_of_element_located((By.XPATH, XPATH_PRIMEIRO_BOTAO))
     )
     print("Botões de renovação carregados com sucesso!")
-    # --- FIM DA ESPERA ---
 
 
     # --- 2. DEBUGGER (AGORA DEPOIS DE ESPERAR) ---
@@ -292,35 +301,52 @@ try:
                             break
                         sleep(0.1)
 
+
                 except TimeoutException:
-                    print(f"❌ Erro: Cliquei em '{titulo}' mas nenhum alerta apareceu.")
-                    nao_renovados.append((titulo, "Clique falhou, nenhum alerta recebido."))
-                    continue
 
-                if not mensagem:
-                    mensagem = "[Alerta visível, mas texto não capturado em 2 segundos]"
+                    print("Não foi possível carregar os botões de renovação no tempo limite (30s).")
 
-                # Processa a mensagem
-                if "renovado com sucesso" in mensagem.lower():
-                    print(f"✅ Livro '{titulo}' renovado com sucesso!")
-                    renovados.append(titulo)
-                else:
-                    print(f"⚠️ Livro '{titulo}' não pôde ser renovado: {mensagem}")
-                    nao_renovados.append((titulo, mensagem))
+                    # --- 3. DEBUGGER NO LOCAL CERTO! ---
 
-                # Espera o alerta DESAPARECER
-                try:
-                    WebDriverWait(web, 10).until(
-                        EC.staleness_of(alert_element)
-                    )
-                except:
-                    print("Aviso: Não foi possível confirmar o desaparecimento do alerta.")
+                    print("DEBUG: Salvando snapshot da PÁGINA TRAVADA...")
 
-                # --- FIM DO TRATAMENTO ROBUSTO ---
+                    try:
+
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+                        screenshot_file = f'debug_emprestimos_FALHA_{timestamp}.png'
+
+                        html_file = f'debug_emprestimos_FALHA_{timestamp}.html'
+
+                        web.save_screenshot(screenshot_file)
+
+                        print(f"DEBUG: Screenshot (VIEWPORT) salvo em '{screenshot_file}'")
+
+                        with open(html_file, 'w', encoding='utf-8') as f:
+
+                            f.write(web.page_source)
+
+                        print(f"DEBUG: HTML salvo em '{html_file}'")
+
+                        print("--- FIM DO DEBUG ---")
+
+                    except Exception as e_debug:
+
+                        print(f"DEBUG: Falha ao salvar arquivos de debug: {e_debug}")
+
+                    # --- FIM DO DEBUGGER ---
+
+                    sendemail(
+                        "Não foi possível carregar a lista de empréstimos no tempo limite (Provável bloqueio de Bot).")
+
 
             except Exception as e:
-                print(f"❌ Erro ao tentar processar o livro '{titulo}': {e}")
-                nao_renovados.append((titulo, f"Erro inesperado no script: {e}"))
+
+                # Captura outros erros
+
+                print(f"Falha geral ao processar a página de pendências: {e}")
+
+                sendemail(f"Falha ao carregar a página de pendências ou erro geral: {e}")
 
         # Envia o e-mail consolidado APÓS o loop
         msg = formatar_email(renovados, nao_renovados)
