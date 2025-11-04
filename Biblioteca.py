@@ -19,15 +19,7 @@ opcoes.add_argument("--window-size=1920,1080")
 opcoes.add_argument("--no-sandbox")
 opcoes.add_argument("--disable-dev-shm-usage")
 opcoes.add_argument("--disable-gpu")
-#opcoes.add_argument("--headless=new")
-opcoes.add_argument('--disable-blink-features=AutomationControlled')
-
-
-# --- PLANO C: User-Agent para melhorar a compatibilidade e renderização ---
-opcoes.add_argument(
-    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
-# -------------------------------------------------------------------------
-
+opcoes.add_argument("--headless=new")
 load_dotenv()
 
 email = os.getenv("UCB_EMAIL")
@@ -166,6 +158,7 @@ if not logado(web):
         email_input = WebDriverWait(web, 30).until(
             EC.element_to_be_clickable((By.ID, 'i0116'))
         )
+        email_input.click()
         email_input.send_keys(email)
         email_input.send_keys(Keys.ENTER)
         print("E-mail inserido.")
@@ -182,6 +175,8 @@ if not logado(web):
         print("Senha inserida.")
 
         sign_in_button.click()
+
+        print("Aguardando navegação da página de senha...")
         WebDriverWait(web, 10).until(
             EC.staleness_of(sign_in_button)
         )
@@ -190,7 +185,7 @@ if not logado(web):
         # Etapa 3: Manter conectado
         print("Procurando botão 'Sim' (Manter conectado)...")
         WebDriverWait(web, 30).until(
-            EC.element_to_be_clickable((By.ID, 'idSIButton9'))
+            EC.element_to_be_clickable((By.ID, 'idSIButton9'))  # Mesmo ID, mas novo elemento
         ).click()
         print("Login Microsoft finalizado.")
 
@@ -202,18 +197,11 @@ if not logado(web):
 else:
     print("Já estava logado.")
 
-# Redirecionamento para a área de empréstimos
 try:
     WebDriverWait(web, 30).until(
         EC.element_to_be_clickable((By.XPATH, '//*[@id="content"]/div[4]/div[1]/div/button[1]'))
     ).click()
     print("Redirecionado para a página 'Meu Pergamum'.")
-
-    # --- PLANO B: ESPERA CUIDADOSA PARA RENDERIZAÇÃO ---
-    print("Aguardando 5 segundos para a renderização completa da página de empréstimos...")
-    sleep(5)
-    # ---------------------------------------------------
-
 except Exception as e:
     print(f"Erro ao clicar no botão 'Empréstimos' após o login: {e}")
     sendemail(f"Falha ao navegar para a área 'Meu Pergamum': {e}")
@@ -224,124 +212,128 @@ renovados = []
 nao_renovados = []
 
 try:
-    # 1. Espera **45 segundos** pelo elemento mais importante: qualquer botão 'Renovar'
-    print("Tentando localizar botões de renovação (Timeout: 45s)...")
-    WebDriverWait(web, 45).until(
-        EC.presence_of_element_located((By.XPATH, "//button[@title='Renovar']"))
+    # --- 1. ESPERA CORRIGIDA (AGORA VEM PRIMEIRO!) ---
+    # Espera até que o PRIMEIRO botão de renovação esteja visível, garantindo que os dados carregaram.
+    XPATH_PRIMEIRO_BOTAO = "//div[@class='tabela']//div[@class='row']//button[@title='Renovar']"
+    print("Aguardando o carregamento dos empréstimos e dos botões de renovação...")
+
+    WebDriverWait(web, 30).until(
+        EC.visibility_of_element_located((By.XPATH, XPATH_PRIMEIRO_BOTAO))
     )
-    print("Pelo menos um botão 'Renovar' foi encontrado no DOM.")
+    print("Botões de renovação carregados com sucesso!")
+    # --- FIM DA ESPERA ---
 
-    # 2. Descobre QUANTOS livros precisam ser processados (para o loop 'for')
-    # Esta contagem é feita APENAS UMA VEZ
-    botoes_iniciais = web.find_elements(By.XPATH, "//button[@title='Renovar']")
-    num_botoes_inicial = len(botoes_iniciais)
 
-    if num_botoes_inicial == 0:
-        raise TimeoutException("Nenhum botão de renovação encontrado após o carregamento.")
+    # --- 2. DEBUGGER (AGORA DEPOIS DE ESPERAR) ---
+    print("DEBUG: Salvando snapshot da página de empréstimos...")
+    try:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        screenshot_file = f'debug_emprestimos_{timestamp}.png'
+        html_file = f'debug_emprestimos_{timestamp}.html'
 
-    print(f"Encontrados {num_botoes_inicial} livros para tentar renovar.")
-
-    # 3. Itera usando um ÍNDICE (de 0 até num_botoes_inicial - 1)
-    #    Isso é CRUCIAL para evitar StaleElementReferenceException
-    for i in range(num_botoes_inicial):
-        print(f"\n--- Processando livro {i + 1} de {num_botoes_inicial} ---")
-        titulo = f"Livro {i + 1} (Título não extraído)"  # Fallback
-
+        # Tenta salvar o screenshot da página inteira
         try:
-            # 4. A CADA ITERAÇÃO, re-busca TODOS os botões
-            #    Espera curta, pois eles já devem estar lá
-            WebDriverWait(web, 45).until(
-                EC.visibility_of_element_located((By.XPATH, "//button[@title='Renovar']"))
-            )
-            # Pausa para estabilização da DOM
-            sleep(2)
+            web.get_screenshot_as_full_page(screenshot_file)
+            print(f"DEBUG: Screenshot (FULL PAGE) salvo em '{screenshot_file}'")
+        except:
+            # Fallback
+            web.save_screenshot(screenshot_file)
+            print(f"DEBUG: Screenshot (VIEWPORT) salvo em '{screenshot_file}'")
 
-            botoes = web.find_elements(By.XPATH, "//button[@title='Renovar']")
+        with open(html_file, 'w', encoding='utf-8') as f:
+            f.write(web.page_source)
+        print(f"DEBUG: HTML salvo em '{html_file}'")
+        print("--- FIM DO DEBUG ---")
+    except Exception as e_debug:
+        print(f"DEBUG: Falha ao salvar arquivos de debug: {e_debug}")
+    # --- FIM DO DEBUG ---
 
-            # Validação:
-            if not botoes:
-                print("AVISO: Não há mais botões 'Renovar' para processar. Saindo do loop.")
-                break  # Sai do loop 'for'
 
-            # 5. Pega o PRIMEIRO botão da lista (índice 0)
-            botao_atual = botoes[0]
+    # A busca agora é mais segura
+    linhas = web.find_elements(By.XPATH, "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]")
+    if not linhas:
+        print("Nenhum título pendente encontrado para renovação.")
+        sendemail("Não foram renovados, pois não há títulos pendentes!")
+    else:
+        print(f"Encontrados {len(linhas)} livros para tentar renovar.")
 
-            # 6. Tenta extrair o título (usando o JS original, que é bom)
+        for linha in linhas:
+            titulo = "Título desconhecido"
             try:
-                titulo_script = """
-                    let row = arguments[0].closest('.row'); // Encontra a div pai da linha
-                    if (row) {
-                        let titleSpan = row.querySelector("span[id^='tit-']");
-                        return titleSpan ? titleSpan.textContent.trim() : arguments[1];
-                    }
-                    return arguments[1];
-                """
-                # Passa o 'botao_atual' (que é o botoes[0]) para o script
-                titulo_candidato = web.execute_script(titulo_script, botao_atual, "")
-                if titulo_candidato:
-                    titulo = titulo_candidato
+                # Extração do Título
+                titulo_element = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]")
+                # Uso de get_attribute("textContent") é mais robusto
+                titulo = titulo_element.get_attribute("textContent").strip() if titulo_element.get_attribute(
+                    "textContent") else titulo_element.text.strip()
+
+                # Pega o botão Renovar
+                botao = linha.find_element(By.XPATH, ".//button[@title='Renovar']")
+
+                print(f"Tentando renovar o livro: {titulo}")
+
+                web.execute_script("arguments[0].scrollIntoView(true);", botao)
+                sleep(0.5)
+                web.execute_script("arguments[0].click();", botao)
+
+                # --- 3. TRATAMENTO ROBUSTO DO ALERTA (Resolve a mensagem vazia) ---
+                alert_element = None
+                mensagem = ""
+
+                try:
+                    # Espera o alerta ficar VISÍVEL
+                    alert_element = WebDriverWait(web, 10).until(
+                        EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
+                    )
+
+                    # Espera o texto ser populado (Polling para evitar Race Condition)
+                    for _ in range(20):  # Tenta 20 vezes a cada 0.1s (total 2s)
+                        mensagem = alert_element.text.strip()
+                        if mensagem:
+                            break
+                        sleep(0.1)
+
+                except TimeoutException:
+                    print(f"❌ Erro: Cliquei em '{titulo}' mas nenhum alerta apareceu.")
+                    nao_renovados.append((titulo, "Clique falhou, nenhum alerta recebido."))
+                    continue
+
+                if not mensagem:
+                    mensagem = "[Alerta visível, mas texto não capturado em 2 segundos]"
+
+                # Processa a mensagem
+                if "renovado com sucesso" in mensagem.lower():
+                    print(f"✅ Livro '{titulo}' renovado com sucesso!")
+                    renovados.append(titulo)
                 else:
-                    print(f"Aviso: JS não retornou título para o botão 0. Usando fallback.")
+                    print(f"⚠️ Livro '{titulo}' não pôde ser renovado: {mensagem}")
+                    nao_renovados.append((titulo, mensagem))
 
-            except Exception as e_js:
-                print(f"Falha ao tentar JS para extrair título: {e_js}. Usando fallback.")
+                # Espera o alerta DESAPARECER
+                try:
+                    WebDriverWait(web, 10).until(
+                        EC.staleness_of(alert_element)
+                    )
+                except:
+                    print("Aviso: Não foi possível confirmar o desaparecimento do alerta.")
 
-            print(f"Tentando renovar o livro: {titulo}")
+                # --- FIM DO TRATAMENTO ROBUSTO ---
 
-            # 7. Clica no PRIMEIRO botão (índice 0)
-            web.execute_script("arguments[0].scrollIntoView(true);", botao_atual)
-            sleep(0.5)
-            web.execute_script("arguments[0].click();", botao_atual)
+            except Exception as e:
+                print(f"❌ Erro ao tentar processar o livro '{titulo}': {e}")
+                nao_renovados.append((titulo, f"Erro inesperado no script: {e}"))
 
-            # 8. Espera o alerta estar VISÍVEL
-            alert_element = WebDriverWait(web, 10).until(
-                EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
-            )
-            mensagem = alert_element.text
+        # Envia o e-mail consolidado APÓS o loop
+        msg = formatar_email(renovados, nao_renovados)
+        sendemail(msg)
 
-            if "renovado com sucesso" in mensagem.lower():
-                print(f"✅ Livro '{titulo}' renovado com sucesso!")
-                renovados.append(titulo)
-            else:
-                print(f"⚠️ Livro '{titulo}' não pôde ser renovado: {mensagem}")
-                nao_renovados.append((titulo, mensagem))
-
-            # Pausa extra longa após o clique para a DOM se re-renderizar
-            print("Aguardando 3 segundos para a página atualizar após o clique...")
-            sleep(3)
-
-        except Exception as e:
-            print(f"❌ Erro ao tentar processar o livro '{titulo}': {e}")
-            nao_renovados.append((titulo, f"Erro inesperado no script: {e}"))
-            # Tenta se recuperar e ir para o próximo, pausando
-            sleep(2)
-
-    # Fim do loop for
-    print("\nTodos os livros foram processados.")
-    msg = formatar_email(renovados, nao_renovados)
-    sendemail(msg)
-
-
-except TimeoutException as e:
-    # Se o botão não aparecer após 45s
+except TimeoutException:
     print(
-        f"Falha crítica: O botão 'Renovar' não apareceu após 45 segundos. Assumindo que não há livros para renovar ou que o site falhou na renderização.")
-
-    # --- DEBUG ---
-    print("Salvando screenshot da falha em 'debug_screenshot.png'...")
-    web.save_screenshot('debug_screenshot.png')
-
-    print("Salvando fonte da página em 'debug_page.html'...")
-    with open('debug_page.html', 'w', encoding='utf-8') as f:
-        f.write(web.page_source)
-    # -------------
-
-    sendemail(
-        "Falha crítica ao tentar renovar os livros. O site pode estar extremamente lento ou falhou na renderização (botão 'Renovar' não encontrado).")
+        "Não foi possível carregar os botões de renovação no tempo limite (30s). A página parece estar travada no carregamento.")
+    sendemail("Não foi possível carregar a lista de empréstimos no tempo limite.")
 except Exception as e:
-    # Erro de estrutura ou qualquer outro erro
-    print(f"Erro ao tentar processar a página de renovação: {e}")
-    sendemail("Erro ao tentar processar a página de renovação. A estrutura do site pode ter mudado.")
+    # Captura outros erros
+    print(f"Falha geral ao processar a página de pendências: {e}")
+    sendemail(f"Falha ao carregar a página de pendências ou erro geral: {e}")
 
 sleep(5)
 print("Processo finalizado!")

@@ -43,12 +43,11 @@ jobs:
           UCB_PASS: ${{ secrets.UCB_PASS }}
         run: python Biblioteca.py
 
-      - name: 💾 Carregar Artefatos de Debug (em caso de falha)
-        if: always() # Sempre execute, mesmo se o passo anterior falhar
+      - name: 💾 Carregar Artefatos de Debug
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: debug-artifacts
           path: |
-            debug_screenshot.png
-            debug_page.html
-          retention-days: 1
+            *.png
+            *.html
