@@ -251,7 +251,7 @@ try:
 
     print("Iniciando processamento de títulos...")
     LINHAS_XPATH = "//span[starts-with(@id, 'tit-')]"  # cada livro visível
-    BOTOES_XPATH = "//button[.//svg[@data-icon='redo-alt']]"  # todos os botões de renovação
+    BOTOES_XPATH = "//button[@title='Renovar' or @title='Renew']"  # todos os botões de renovação
 
     titulos = web.find_elements(By.XPATH, LINHAS_XPATH)
     botoes = web.find_elements(By.XPATH, BOTOES_XPATH)
