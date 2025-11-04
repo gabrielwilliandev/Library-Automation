@@ -7,11 +7,16 @@ on:
 
 jobs:
   renovar-livros:
-    runs-on: windows-latest # Usa a máquina virtual mais recente do Ubuntu
+    runs-on: ubuntu-latest # <-- Manter Ubuntu
 
     steps:
       - name:  checkout
         uses: actions/checkout@v4
+
+      # --- NOVO PASSO AQUI: Inicia o display virtual ---
+      - name: Instalar e Iniciar XVFB
+        uses: coactions/setup-xvfb@v1
+      # -------------------------------------------------
 
       - name: 🏗️ Configurar Python 3.10
         uses: actions/setup-python@v5
