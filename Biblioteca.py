@@ -29,7 +29,7 @@ opcoes.add_argument("--window-size=1920,1080")
 opcoes.add_argument("--no-sandbox")
 opcoes.add_argument("--disable-dev-shm-usage")
 opcoes.add_argument("--disable-gpu")
-opcoes.add_argument("--headless=new")
+#opcoes.add_argument("--headless=new")
 
 # --- FIM DAS OPÇÕES ANTI-BOT ---
 
@@ -259,6 +259,14 @@ try:
     else:
         print(f"Encontradas {len(linhas)} linhas de livros para processar.")
 
+        # 🕐 Aguarda os botões 'Renovar' aparecerem
+        try:
+            WebDriverWait(web, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//button[@title='Renovar']"))
+            )
+            print("Botões 'Renovar' detectados na página.")
+        except TimeoutException:
+            print("⚠️ Nenhum botão 'Renovar' detectado após 10s (pode ser atraso no carregamento).")
         for i, linha in enumerate(linhas, start=1):
             titulo = "Título desconhecido"
             try:
