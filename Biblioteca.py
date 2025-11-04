@@ -12,13 +12,19 @@ from datetime import datetime
 from time import sleep
 import os
 from dotenv import load_dotenv
+import random  # <--- NOVO: Adicionado para humanizar a navegação
 
+# --- OPÇÕES ANTI-BOT ---
 opcoes = webdriver.ChromeOptions()
 
-opcoes.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+# 1. Adiciona um User-Agent "humano"
+opcoes.add_argument(
+    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 
+# 2. Desativa a flag "navigator.webdriver"
 opcoes.add_experimental_option("excludeSwitches", ["enable-automation"])
 opcoes.add_experimental_option("useAutomationExtension", False)
+# --- FIM DAS OPÇÕES ANTI-BOT ---
 
 opcoes.add_argument("--window-size=1920,1080")
 opcoes.add_argument("--no-sandbox")
@@ -27,12 +33,6 @@ opcoes.add_argument("--disable-gpu")
 opcoes.add_argument("--headless=new")
 
 load_dotenv()
-
-# ... (restante do seu script) ...
-
-web = webdriver.Chrome(options=opcoes)
-# Adiciona um script para remover a propriedade 'webdriver' após a inicialização, garantindo que ela suma.
-web.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
 email = os.getenv("UCB_EMAIL")
 password = os.getenv("UCB_PASS")
@@ -121,11 +121,15 @@ def logado(web):
         return False
 
 
-print("WebDriver iniciado.")
+web = webdriver.Chrome(options=opcoes)
+# Script para remover a propriedade 'webdriver' após a inicialização
+web.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+print("WebDriver iniciado e configurações anti-bot aplicadas.")
 
 try:
     web.get(URL)
     print("Página de login aberta.")
+    sleep(random.uniform(1.0, 3.0))  # NOVO: Espera aleatória
 except WebDriverException as e:
     print(f"Erro ao acessar o site: {e}")
     sendemail("não foram possíveis de renovar. O site pode estar fora do ar. 📵")
@@ -147,12 +151,14 @@ try:
             const pop = document.querySelector('.vp-pop-up');
             if (pop) pop.remove();
         """)
+        sleep(random.uniform(0.5, 1.0))  # NOVO: Espera após remover pop-up
 
     elemento_login = WebDriverWait(web, 30).until(
         EC.element_to_be_clickable(
             (By.XPATH, '//*[@id="pergamum"]/div[2]/div/div[1]/div/div[1]/div/div[2]/div[2]/form/div[1]/div[2]/div'))
     )
     web.execute_script("arguments[0].scrollIntoView(true);", elemento_login)
+    sleep(random.uniform(0.5, 1.5))  # NOVO: Espera antes do clique
     elemento_login.click()
     print("Clique no botão 'Comunidade Acadêmica' realizado.")
 
@@ -173,6 +179,7 @@ if not logado(web):
         email_input.send_keys(email)
         email_input.send_keys(Keys.ENTER)
         print("E-mail inserido.")
+        sleep(random.uniform(1.0, 2.0))  # NOVO: Espera após inserir e-mail
 
         # Etapa 2: Senha
         pass_input = WebDriverWait(web, 30).until(
@@ -192,6 +199,7 @@ if not logado(web):
             EC.staleness_of(sign_in_button)
         )
         print("Página de senha navegou com sucesso.")
+        sleep(random.uniform(1.0, 2.0))  # NOVO: Espera após submeter senha
 
         # Etapa 3: Manter conectado
         print("Procurando botão 'Sim' (Manter conectado)...")
@@ -199,6 +207,7 @@ if not logado(web):
             EC.element_to_be_clickable((By.ID, 'idSIButton9'))  # Mesmo ID, mas novo elemento
         ).click()
         print("Login Microsoft finalizado.")
+        sleep(random.uniform(1.5, 3.0))  # NOVO: Espera após o login ser finalizado
 
     except Exception as e:
         print(f"Erro durante o fluxo de login da Microsoft: {e}")
@@ -213,6 +222,8 @@ try:
         EC.element_to_be_clickable((By.XPATH, '//*[@id="content"]/div[4]/div[1]/div/button[1]'))
     ).click()
     print("Redirecionado para a página 'Meu Pergamum'.")
+    sleep(
+        random.uniform(1.0, 2.0))  # NOVO: Espera após clicar no botão de empréstimos (crucial para o carregamento AJAX)
 except Exception as e:
     print(f"Erro ao clicar no botão 'Empréstimos' após o login: {e}")
     sendemail(f"Falha ao navegar para a área 'Meu Pergamum': {e}")
@@ -222,30 +233,50 @@ except Exception as e:
 renovados = []
 nao_renovados = []
 
+# --- INÍCIO DO BLOCO ROBUSTO DE PROCESSAMENTO DE EMPRÉSTIMOS ---
 try:
-    # 1. ESPERA CORRIGIDA (AINDA VAI FALHAR AQUI)
-    XPATH_PRIMEIRO_BOTAO = "//div[@class='tabela']//div[@class='row']//button[@title='Renovar']"
-    print("Aguardando o carregamento dos empréstimos e dos botões de renovação...")
+    # 1. ESPERA ROBUSTA: Esperar o Spinner de Carregamento desaparecer
+    # Se há ou não livros, o spinner SEMPRE aparece primeiro.
+    SPINNER_XPATH = "(//div[@class='tabela'])[1]//div[@role='status']"
+    print("Aguardando o carregamento da lista de 'Títulos pendentes' (max 30s)...")
 
-    WebDriverWait(web, 30).until(
-        EC.visibility_of_element_located((By.XPATH, XPATH_PRIMEIRO_BOTAO))
-    )
-    print("Botões de renovação carregados com sucesso!")
+    # Espera até que o spinner (indicando carregamento) fique INVISÍVEL
+    try:
+        WebDriverWait(web, 30).until(
+            EC.invisibility_of_element_located((By.XPATH, SPINNER_XPATH))
+        )
+        print("Carregamento da lista de empréstimos finalizado.")
+    except TimeoutException:
+        print("ERRO DE CARREGAMENTO: O spinner não desapareceu após 30s. A página pode ter travado.")
 
+        # DEBUGGER DE FALHA (Aqui tira o print de falha)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        screenshot_file = f'debug_emprestimos_FALHA_{timestamp}.png'
+        html_file = f'debug_emprestimos_FALHA_{timestamp}.html'
+        web.save_screenshot(screenshot_file)
+        with open(html_file, 'w', encoding='utf-8') as f:
+            f.write(web.page_source)
+        print(f"DEBUG: Screenshot de falha salvo em '{screenshot_file}'")
 
-    # --- 2. DEBUGGER (AGORA DEPOIS DE ESPERAR) ---
+        sendemail("Não foi possível carregar a lista de empréstimos no tempo limite (Provável bloqueio de Bot).")
+        web.quit()
+        exit()
+    # --- FIM DA ESPERA ROBUSTA ---
+
+    # 2. DEBUGGER (APÓS O CARREGAMENTO SER CONFIRMADO)
     print("DEBUG: Salvando snapshot da página de empréstimos...")
     try:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         screenshot_file = f'debug_emprestimos_{timestamp}.png'
         html_file = f'debug_emprestimos_{timestamp}.html'
 
-        # Tenta salvar o screenshot da página inteira
+        # TÉCNICA CORRIGIDA PARA FULL PAGE NO CHROME/SELENIUM
         try:
-            web.get_screenshot_as_full_page(screenshot_file)
+            S = lambda X: web.execute_script('return document.body.parentNode.scroll' + X)
+            web.set_window_size(S('Width'), S('Height'))
+            web.find_element(By.TAG_NAME, 'body').screenshot(screenshot_file)
             print(f"DEBUG: Screenshot (FULL PAGE) salvo em '{screenshot_file}'")
         except:
-            # Fallback
             web.save_screenshot(screenshot_file)
             print(f"DEBUG: Screenshot (VIEWPORT) salvo em '{screenshot_file}'")
 
@@ -255,11 +286,13 @@ try:
         print("--- FIM DO DEBUG ---")
     except Exception as e_debug:
         print(f"DEBUG: Falha ao salvar arquivos de debug: {e_debug}")
-    # --- FIM DO DEBUG ---
+    # --- FIM DO DEBUGGER ---
 
+    # 3. PROCESSAMENTO
+    # find_elements (plural) não falha se não houver linhas, retorna lista vazia.
+    LINHA_XPATH = "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]"
+    linhas = web.find_elements(By.XPATH, LINHA_XPATH)
 
-    # A busca agora é mais segura
-    linhas = web.find_elements(By.XPATH, "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]")
     if not linhas:
         print("Nenhum título pendente encontrado para renovação.")
         sendemail("Não foram renovados, pois não há títulos pendentes!")
@@ -271,7 +304,6 @@ try:
             try:
                 # Extração do Título
                 titulo_element = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]")
-                # Uso de get_attribute("textContent") é mais robusto
                 titulo = titulo_element.get_attribute("textContent").strip() if titulo_element.get_attribute(
                     "textContent") else titulo_element.text.strip()
 
@@ -281,85 +313,59 @@ try:
                 print(f"Tentando renovar o livro: {titulo}")
 
                 web.execute_script("arguments[0].scrollIntoView(true);", botao)
-                sleep(0.5)
+                sleep(random.uniform(0.5, 1.0))  # NOVO: Espera antes do clique
                 web.execute_script("arguments[0].click();", botao)
 
-                # --- 3. TRATAMENTO ROBUSTO DO ALERTA (Resolve a mensagem vazia) ---
+                # --- TRATAMENTO ROBUSTO DO ALERTA ---
                 alert_element = None
                 mensagem = ""
 
                 try:
-                    # Espera o alerta ficar VISÍVEL
                     alert_element = WebDriverWait(web, 10).until(
                         EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
                     )
 
-                    # Espera o texto ser populado (Polling para evitar Race Condition)
-                    for _ in range(20):  # Tenta 20 vezes a cada 0.1s (total 2s)
+                    # Espera o texto ser populado (Polling)
+                    for _ in range(20):
                         mensagem = alert_element.text.strip()
                         if mensagem:
                             break
                         sleep(0.1)
 
-
                 except TimeoutException:
+                    print(f"❌ Erro: Cliquei em '{titulo}' mas nenhum alerta apareceu.")
+                    nao_renovados.append((titulo, "Clique falhou, nenhum alerta recebido."))
+                    continue
 
-                    print("Não foi possível carregar os botões de renovação no tempo limite (30s).")
+                if not mensagem:
+                    mensagem = "[Alerta visível, mas texto não capturado em 2 segundos]"
 
-                    # --- 3. DEBUGGER NO LOCAL CERTO! ---
+                if "renovado com sucesso" in mensagem.lower():
+                    print(f"✅ Livro '{titulo}' renovado com sucesso!")
+                    renovados.append(titulo)
+                else:
+                    print(f"⚠️ Livro '{titulo}' não pôde ser renovado: {mensagem}")
+                    nao_renovados.append((titulo, mensagem))
 
-                    print("DEBUG: Salvando snapshot da PÁGINA TRAVADA...")
-
-                    try:
-
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-                        screenshot_file = f'debug_emprestimos_FALHA_{timestamp}.png'
-
-                        html_file = f'debug_emprestimos_FALHA_{timestamp}.html'
-
-                        web.save_screenshot(screenshot_file)
-
-                        print(f"DEBUG: Screenshot (VIEWPORT) salvo em '{screenshot_file}'")
-
-                        with open(html_file, 'w', encoding='utf-8') as f:
-
-                            f.write(web.page_source)
-
-                        print(f"DEBUG: HTML salvo em '{html_file}'")
-
-                        print("--- FIM DO DEBUG ---")
-
-                    except Exception as e_debug:
-
-                        print(f"DEBUG: Falha ao salvar arquivos de debug: {e_debug}")
-
-                    # --- FIM DO DEBUGGER ---
-
-                    sendemail(
-                        "Não foi possível carregar a lista de empréstimos no tempo limite (Provável bloqueio de Bot).")
-
+                try:
+                    WebDriverWait(web, 10).until(EC.staleness_of(alert_element))
+                except:
+                    print("Aviso: Não foi possível confirmar o desaparecimento do alerta.")
+                # --- FIM DO TRATAMENTO ROBUSTO ---
 
             except Exception as e:
-
-                # Captura outros erros
-
-                print(f"Falha geral ao processar a página de pendências: {e}")
-
-                sendemail(f"Falha ao carregar a página de pendências ou erro geral: {e}")
+                print(f"❌ Erro ao tentar processar o livro '{titulo}': {e}")
+                nao_renovados.append((titulo, f"Erro inesperado no script: {e}"))
 
         # Envia o e-mail consolidado APÓS o loop
         msg = formatar_email(renovados, nao_renovados)
         sendemail(msg)
 
-except TimeoutException:
-    print(
-        "Não foi possível carregar os botões de renovação no tempo limite (30s). A página parece estar travada no carregamento.")
-    sendemail("Não foi possível carregar a lista de empréstimos no tempo limite.")
 except Exception as e:
-    # Captura outros erros
+    # Captura erros gerais (se algo falhou fora do fluxo de renovação)
     print(f"Falha geral ao processar a página de pendências: {e}")
     sendemail(f"Falha ao carregar a página de pendências ou erro geral: {e}")
+# --- FIM DO BLOCO ROBUSTO DE PROCESSAMENTO ---
 
 sleep(5)
 print("Processo finalizado!")
