@@ -208,11 +208,25 @@ renovados = []
 nao_renovados = []
 
 try:
+    # 1. Espera a estrutura principal da tabela
     WebDriverWait(web, 30).until(
         EC.presence_of_element_located((By.XPATH, "//div[@class='tabela']"))
     )
-    print("Página de pendências carregada. Procurando livros...")
+    print("Página de pendências carregada. Tentando localizar livros...")
 
+    # 2. Tenta esperar explicitamente pela primeira linha de livro com o botão 'Renovar'
+    try:
+        WebDriverWait(web, 10).until(
+            EC.presence_of_element_located(
+                (By.XPATH, "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]"))
+        )
+        print("Pelo menos um livro com botão 'Renovar' foi encontrado. Coletando todos os livros.")
+    except:
+        # Se falhar após 10 segundos, a tabela provavelmente não tem livros para renovar (o que pode ser o caso)
+        print("Nenhuma linha de livro com botão 'Renovar' foi encontrada (Pode estar vazia ou a renderização demorou).")
+        pass
+
+    # 3. Coleta os elementos, que agora devem estar totalmente carregados (ou será uma lista vazia)
     linhas = web.find_elements(By.XPATH, "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]")
 
     if not linhas:
@@ -222,11 +236,13 @@ try:
         print(f"Encontrados {len(linhas)} livros para tentar renovar.")
 
         for linha in linhas:
+            # ... (o loop de renovação aqui, que já está funcionando) ...
             titulo = "Título desconhecido"
             try:
+                # ... (resto do seu loop de renovação, garantindo a correção do .textContent) ...
                 titulo_element = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]")
-                titulo = titulo_element.get_attribute("textContent")
 
+                titulo = titulo_element.get_attribute("textContent")
                 if titulo:
                     titulo = titulo.strip()
                 if not titulo:
