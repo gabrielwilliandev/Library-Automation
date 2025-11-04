@@ -198,45 +198,41 @@ if pendente(web):
     renovados = []
     nao_renovados = []
 
-    # Captura todas as linhas com botão "Renovar"
-    linhas = web.find_elements(By.XPATH, "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]")
+    # Captura a quantidade inicial de linhas com botão de renovação
+    linhas_xpath = "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]"
+    linhas = web.find_elements(By.XPATH, linhas_xpath)
+    total_linhas = len(linhas)
+    print(f"Foram encontradas {total_linhas} linhas com botão de renovação.")
 
-    for linha in linhas:
+    for i in range(total_linhas):
         try:
-            # Pega o título do livro dentro da linha
-            titulo = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]").text
+            # Recarrega os elementos a cada iteração (para evitar stale references)
+            linhas_atualizadas = web.find_elements(By.XPATH, linhas_xpath)
+            if i >= len(linhas_atualizadas):
+                break  # caso a página tenha mudado e o índice não exista mais
 
-            # Pega o botão Renovar dentro da linha
+            linha = linhas_atualizadas[i]
+
+            # Pega o título e o botão da linha atual
+            titulo = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]").text
             botao = linha.find_element(By.XPATH, ".//button[@title='Renovar']")
 
             print(f"Tentando renovar o livro: {titulo}")
 
-            # Faz o scroll até o botão
-            web.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", botao)
-            sleep(0.8)
+            # Garante que o botão está visível e clicável
+            web.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao)
+            web.execute_script("window.scrollBy(0, -100);")  # ajusta posição
+            WebDriverWait(web, 10).until(EC.element_to_be_clickable(botao))
 
-            # Simula um clique real (mousedown + mouseup + click)
-            web.execute_script("""
-                const el = arguments[0];
-                const rect = el.getBoundingClientRect();
-                ['mousedown', 'mouseup', 'click'].forEach(evt => {
-                    el.dispatchEvent(new MouseEvent(evt, {
-                        bubbles: true,
-                        cancelable: true,
-                        view: window,
-                        clientX: rect.x + 5,
-                        clientY: rect.y + 5
-                    }));
-                });
-            """, botao)
+            # Clica via JavaScript (mais confiável em headless)
+            web.execute_script("arguments[0].click();", botao)
+            print(f"🔘 Clique realizado para '{titulo}'")
 
-            # Aguarda a mensagem de feedback aparecer
+            # Aguarda o alerta de retorno
             WebDriverWait(web, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
             )
-
             mensagem = web.find_element(By.CSS_SELECTOR, '[role="alert"]').text
-            print(f"📩 Mensagem recebida: {mensagem}")
 
             if "renovado com sucesso" in mensagem.lower():
                 print(f"✅ Livro '{titulo}' renovado com sucesso!")
@@ -245,13 +241,14 @@ if pendente(web):
                 print(f"⚠️ Livro '{titulo}' não pôde ser renovado: {mensagem}")
                 nao_renovados.append((titulo, mensagem))
 
-            sleep(1.2)  # pausa entre as renovações
+            sleep(1.5)  # pausa entre cliques para estabilidade
 
         except Exception as e:
             print(f"❌ Erro ao tentar renovar '{titulo}': {e}")
-            nao_renovados.append((titulo, "Erro no clique ou resposta inesperada"))
+            nao_renovados.append((titulo, str(e)))
+            sleep(1)
 
-    # Formata e envia o relatório
+    # Após o loop, envia o e-mail consolidado
     msg = formatar_email(renovados, nao_renovados)
     sendemail(msg)
 
