@@ -249,47 +249,37 @@ try:
     print(f"DEBUG: HTML salvo em '{html_file}'")
     print("--- FIM DO DEBUG ---")
 
-    LINHA_XPATH_TODAS = "(//div[@class='tabela'])[1]//div[contains(@class, 'row') and .//span[starts-with(@id, 'tit-')]]"
+    print("Iniciando processamento de títulos...")
+    LINHAS_XPATH = "//span[starts-with(@id, 'tit-')]"  # cada livro visível
+    BOTOES_XPATH = "//button[@title='Renovar']"  # todos os botões de renovação
 
-    linhas = web.find_elements(By.XPATH, LINHA_XPATH_TODAS)
+    titulos = web.find_elements(By.XPATH, LINHAS_XPATH)
+    botoes = web.find_elements(By.XPATH, BOTOES_XPATH)
 
-    if not linhas:
-        print("Nenhum título pendente (linha de dados) encontrado para renovação.")
-        sendemail("Não foram renovados, pois não há títulos pendentes! (XPath não retornou linhas)")
+    print(f"Encontrados {len(titulos)} títulos e {len(botoes)} botões de renovação.")
+
+    if not titulos or not botoes:
+        sendemail("Nenhum livro foi renovado: não foram encontrados títulos ou botões 'Renovar'.")
     else:
-        print(f"Encontradas {len(linhas)} linhas de livros para processar.")
+        for i, titulo_element in enumerate(titulos):
+            titulo = titulo_element.text.strip() or "Título não identificado"
+            print(f"[{i + 1}] Tentando renovar: {titulo}")
 
-        # 🕐 Aguarda os botões 'Renovar' aparecerem
-        try:
-            WebDriverWait(web, 10).until(
-                EC.presence_of_element_located((By.XPATH, "//button[@title='Renovar']"))
-            )
-            print("Botões 'Renovar' detectados na página.")
-        except TimeoutException:
-            print("⚠️ Nenhum botão 'Renovar' detectado após 10s (pode ser atraso no carregamento).")
-        for i, linha in enumerate(linhas, start=1):
-            titulo = "Título desconhecido"
+            # Garante que o índice exista
+            if i >= len(botoes):
+                print(f"⚠️ Sem botão correspondente para '{titulo}'.")
+                nao_renovados.append((titulo, "Sem botão correspondente."))
+                continue
+
+            botao = botoes[i]
+
             try:
-                # 🎯 Extrai o título do span com id que começa com 'tit-'
-                titulo_element = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]")
-                titulo = titulo_element.text.strip() or "Título não identificado"
-
-                print(f"[{i}] Processando livro: {titulo}")
-
-                # 🔍 Encontra o botão de renovação
-                botoes_renovar = linha.find_elements(By.XPATH, ".//button[@title='Renovar']")
-                if not botoes_renovar:
-                    print(f"Livro '{titulo}' encontrado, mas sem botão 'Renovar'. Ignorando.")
-                    continue
-
-                botao = botoes_renovar[0]
-
-                # 🔄 Executa clique com JS (mais confiável no GitHub Actions)
                 web.execute_script("arguments[0].scrollIntoView(true);", botao)
-                sleep(random.uniform(0.5, 1.0))
+                sleep(random.uniform(0.8, 1.2))
                 web.execute_script("arguments[0].click();", botao)
+                print(f"🖱️ Clique no botão 'Renovar' executado para '{titulo}'.")
 
-                # 🕐 Aguarda o alerta após clicar
+                # Espera o alerta aparecer
                 mensagem = ""
                 try:
                     alert_element = WebDriverWait(web, 10).until(
@@ -301,32 +291,28 @@ try:
                             break
                         sleep(0.1)
                 except TimeoutException:
-                    print(f"❌ Cliquei em '{titulo}', mas nenhum alerta apareceu.")
+                    print(f"❌ Nenhum alerta apareceu para '{titulo}'.")
                     nao_renovados.append((titulo, "Nenhum alerta após clique."))
                     continue
 
                 if not mensagem:
-                    mensagem = "[Alerta visível, mas texto vazio]"
+                    mensagem = "[Alerta visível, mas sem texto]"
 
                 if "renovado com sucesso" in mensagem.lower():
-                    print(f"✅ Livro '{titulo}' renovado com sucesso!")
+                    print(f"✅ '{titulo}' renovado com sucesso!")
                     renovados.append(titulo)
                 else:
-                    print(f"⚠️ Livro '{titulo}' não pôde ser renovado: {mensagem}")
+                    print(f"⚠️ '{titulo}' não pôde ser renovado: {mensagem}")
                     nao_renovados.append((titulo, mensagem))
 
+                # Espera o alerta sumir
                 try:
                     WebDriverWait(web, 10).until(EC.staleness_of(alert_element))
                 except:
-                    print("Aviso: alerta não desapareceu, continuando mesmo assim.")
+                    print("Aviso: alerta não desapareceu, continuando...")
 
             except Exception as e:
-                print(f"❌ Erro ao processar linha {i} ('{titulo}'): {e}")
-                try:
-                    with open(f'debug_linha_{i}.html', 'w', encoding='utf-8') as f:
-                        f.write(linha.get_attribute('outerHTML'))
-                except:
-                    pass
+                print(f"❌ Erro ao processar '{titulo}': {e}")
                 nao_renovados.append((titulo, f"Erro inesperado: {e}"))
 
         msg = formatar_email(renovados, nao_renovados)
