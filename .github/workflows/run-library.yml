@@ -3,7 +3,7 @@ name: 📚 Renovação Automática de Livros
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 20 * * *'  # 17:00 horário de Brasília (20:00 UTC)
+    - cron: '0 12 * * *'  # 09:00 horário de Brasília (12:00 UTC)
 
 jobs:
   renovar-livros:
