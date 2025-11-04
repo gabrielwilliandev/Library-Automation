@@ -7,16 +7,16 @@ on:
 
 jobs:
   renovar-livros:
-    runs-on: ubuntu-latest # <-- Manter Ubuntu
+    runs-on: ubuntu-latest
 
     steps:
       - name:  checkout
         uses: actions/checkout@v4
 
-      # --- NOVO PASSO AQUI: Inicia o display virtual ---
-      - name: Instalar e Iniciar XVFB
+      - name: Instalar e Iniciar XVFB (Display Virtual)
         uses: coactions/setup-xvfb@v1
-      # -------------------------------------------------
+        with:
+          run: start  # <-- CORREÇÃO: Define o input 'run' para iniciar o display
 
       - name: 🏗️ Configurar Python 3.10
         uses: actions/setup-python@v5
@@ -26,18 +26,16 @@ jobs:
       - name: 📦 Instalar dependências do Python
         run: |
           python -m pip install --upgrade pip
-          # Instala as bibliotecas que seu script usa
           pip install selenium python-dotenv emoji
-          # Se você tiver um requirements.txt, mude para:
-          # pip install -r requirements.txt
 
-      - name: 🌐 Configurar Google Chrome
-        # Esta Ação instala o Google Chrome e o ChromeDriver no runner
-        uses: browser-actions/setup-chrome@latest
+      - name: Instalar Google Chrome (via Playwright)
+        uses: microsoft/playwright-github-action@v1.0
+        with:
+          browser: chromium # Chromium é o motor do Chrome
 
       - name: 🚀 Executar script de renovação
         env:
-          # Puxa os segredos que você configurou no repositório
           UCB_EMAIL: ${{ secrets.UCB_EMAIL }}
           UCB_PASS: ${{ secrets.UCB_PASS }}
+        # Lembre-se de usar a última versão do Biblioteca.py (Plano E - Força Bruta)
         run: python Biblioteca.py
