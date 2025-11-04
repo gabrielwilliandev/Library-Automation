@@ -202,16 +202,25 @@ if pendente(web):
 
     for linha in linhas:
         try:
-            # Pega o título do livro dentro da linha
             titulo = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]").text
-
-            # Pega o botão Renovar dentro da linha
-            botao = linha.find_element(By.XPATH, ".//button[@title='Renovar']")
-
             print(f"Tentando renovar o livro: {titulo}")
 
-            web.execute_script("arguments[0].scrollIntoView(true);", botao)
+            # Remove overlays antes de clicar
+            web.execute_script("""
+                document.querySelectorAll('.vp-pop-up, .fade, .modal-backdrop')
+                        .forEach(el => el.remove());
+            """)
+
+            # Rebusa o botão antes do clique
+            botao = linha.find_element(By.XPATH, ".//button[@title='Renovar']")
+
+            web.execute_script("arguments[0].scrollIntoView({behavior:'smooth',block:'center'});", botao)
             sleep(0.5)
+
+            # Rebusa novamente após o scroll (para evitar stale)
+            botao = linha.find_element(By.XPATH, ".//button[@title='Renovar']")
+
+            # Clica via JS (mais confiável que .click())
             web.execute_script("arguments[0].click();", botao)
 
             WebDriverWait(web, 10).until(
@@ -226,7 +235,6 @@ if pendente(web):
                 print(f"⚠️ Livro '{titulo}' não pôde ser renovado: {mensagem}")
                 nao_renovados.append((titulo, mensagem))
 
-            # Pequena pausa para evitar conflito entre cliques
             sleep(1)
 
         except Exception as e:
