@@ -3,7 +3,7 @@ name: 📚 Renovação Automática de Livros
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 15 * * *'
+    - cron: '45 19 * * *'
 
 jobs:
   renovar-livros:
