@@ -15,7 +15,12 @@ from dotenv import load_dotenv
 
 
 opcoes = webdriver.ChromeOptions()
-opcoes.add_argument('--headless=new')
+
+opcoes.add_argument("--window-size=1920,1080")
+opcoes.add_argument("--no-sandbox")
+opcoes.add_argument("--disable-dev-shm-usage")
+opcoes.add_argument("--disable-gpu")
+opcoes.add_argument("--headless=new")
 load_dotenv()
 
 email = os.getenv("UCB_EMAIL")
@@ -136,8 +141,27 @@ except:
 
 sleep(3)
 
-web.find_element(By.XPATH, '//*[@id="pergamum"]/div[2]/div/div[1]/div/div'
-                               '[1]/div/div[2]/div[2]/form/div[1]/div[2]/div').click()
+try:
+    WebDriverWait(web, 5).until_not(
+        EC.presence_of_element_located((By.CSS_SELECTOR, '.vp-pop-up'))
+    )
+except:
+    # Caso continue visível, remove via JavaScript
+    web.execute_script("""
+        const pop = document.querySelector('.vp-pop-up');
+        if (pop) pop.remove();
+    """)
+
+# 🔹 Agora sim, pode clicar com segurança
+try:
+    elemento_login = web.find_element(By.XPATH, '//*[@id="pergamum"]/div[2]/div/div[1]/div/div'
+                                                '[1]/div/div[2]/div[2]/form/div[1]/div[2]/div')
+    web.execute_script("arguments[0].scrollIntoView(true);", elemento_login)
+    elemento_login.click()
+    print("Clique inicial realizado com sucesso!")
+except Exception as e:
+    print(f"Erro ao clicar no botão inicial: {e}")
+
 if logado(web):
     print("Logado!")
 
@@ -187,7 +211,8 @@ if pendente(web):
             print(f"Tentando renovar o livro: {titulo}")
 
             web.execute_script("arguments[0].scrollIntoView(true);", botao)
-            botao.click()
+            sleep(0.5)
+            web.execute_script("arguments[0].click();", botao)
 
             WebDriverWait(web, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
