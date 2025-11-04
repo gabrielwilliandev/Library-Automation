@@ -20,6 +20,12 @@ opcoes.add_argument("--no-sandbox")
 opcoes.add_argument("--disable-dev-shm-usage")
 opcoes.add_argument("--disable-gpu")
 opcoes.add_argument("--headless=new")
+
+# --- PLANO C: User-Agent para evitar detecção de bot e melhorar a renderização ---
+opcoes.add_argument(
+    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+# ---------------------------------------------------------------------------------
+
 load_dotenv()
 
 email = os.getenv("UCB_EMAIL")
@@ -153,17 +159,19 @@ except Exception as e:
 if not logado(web):
     print("Iniciando fluxo de login da Microsoft...")
     try:
+        # Etapa 1: E-mail
         email_input = WebDriverWait(web, 30).until(
             EC.element_to_be_clickable((By.ID, 'i0116'))
         )
-        email_input.click()
         email_input.send_keys(email)
         email_input.send_keys(Keys.ENTER)
         print("E-mail inserido.")
 
+        # Etapa 2: Senha
         pass_input = WebDriverWait(web, 30).until(
             EC.element_to_be_clickable((By.ID, 'i0118'))
         )
+        # Captura o botão "Entrar" antes de digitar a senha
         sign_in_button = WebDriverWait(web, 30).until(
             EC.element_to_be_clickable((By.ID, 'idSIButton9'))
         )
@@ -171,14 +179,14 @@ if not logado(web):
         pass_input.send_keys(password)
         print("Senha inserida.")
 
+        # Clica no botão "Entrar" e espera a página mudar
         sign_in_button.click()
-
-        print("Aguardando navegação da página de senha...")
         WebDriverWait(web, 10).until(
             EC.staleness_of(sign_in_button)
         )
         print("Página de senha navegou com sucesso.")
 
+        # Etapa 3: Manter conectado
         print("Procurando botão 'Sim' (Manter conectado)...")
         WebDriverWait(web, 30).until(
             EC.element_to_be_clickable((By.ID, 'idSIButton9'))
@@ -193,11 +201,18 @@ if not logado(web):
 else:
     print("Já estava logado.")
 
+# Redirecionamento para a área de empréstimos
 try:
     WebDriverWait(web, 30).until(
         EC.element_to_be_clickable((By.XPATH, '//*[@id="content"]/div[4]/div[1]/div/button[1]'))
     ).click()
     print("Redirecionado para a página 'Meu Pergamum'.")
+
+    # --- PLANO B: ESPERA CUIDADOSA PARA RENDERIZAÇÃO ---
+    print("Aguardando 5 segundos para a renderização completa da tabela de empréstimos...")
+    sleep(5)
+    # ---------------------------------------------------
+
 except Exception as e:
     print(f"Erro ao clicar no botão 'Empréstimos' após o login: {e}")
     sendemail(f"Falha ao navegar para a área 'Meu Pergamum': {e}")
@@ -214,8 +229,7 @@ try:
     )
     print("Página de pendências carregada. Tentando localizar livros...")
 
-    # 2. **A MUDANÇA MAIS IMPORTANTE:** Espera 20 segundos pela primeira linha de livro
-    # Se a tabela não carregar, ela falhará aqui.
+    # 2. Tenta esperar **20 segundos** pela primeira linha de livro
     try:
         WebDriverWait(web, 20).until(
             EC.presence_of_element_located(
@@ -225,15 +239,13 @@ try:
     except:
         print(
             "Nenhuma linha de livro com botão 'Renovar' foi encontrada após 20s. Assumindo que não há livros pendentes ou que a renderização falhou.")
-        # Se cair aqui, a lista 'linhas' abaixo será vazia, e o script seguirá normalmente.
         pass
 
-        # 3. Coleta os elementos. Se a espera acima falhou, a lista 'linhas' estará vazia.
+        # 3. Coleta os elementos
     linhas = web.find_elements(By.XPATH, "//div[@class='tabela']//div[@class='row'][div//button[@title='Renovar']]")
 
     if not linhas:
         print("Nenhum título pendente encontrado para renovação.")
-        # Se o e-mail não foi enviado antes, ele será enviado aqui
         sendemail("Não foram renovados, pois não há títulos pendentes!")
     else:
         print(f"Encontrados {len(linhas)} livros para tentar renovar.")
@@ -241,6 +253,7 @@ try:
         for linha in linhas:
             titulo = "Título desconhecido"
             try:
+                # Usa .get_attribute("textContent") para garantir que o título não seja vazio
                 titulo_element = linha.find_element(By.XPATH, ".//span[starts-with(@id, 'tit-')]")
 
                 titulo = titulo_element.get_attribute("textContent")
@@ -257,6 +270,7 @@ try:
                 sleep(0.5)
                 web.execute_script("arguments[0].click();", botao)
 
+                # Espera o alerta estar VISÍVEL para capturar a mensagem de erro
                 alert_element = WebDriverWait(web, 10).until(
                     EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
                 )
@@ -279,7 +293,6 @@ try:
         sendemail(msg)
 
 except Exception as e:
-    # Se a tabela não carregar em 30s, ou der timeout, entra aqui.
     print(f"Não foi possível localizar a tabela de pendências (ou não há pendentes): {e}")
     sendemail("Não foi possível carregar a página de pendências ou não há títulos pendentes.")
 
