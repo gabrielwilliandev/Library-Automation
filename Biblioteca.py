@@ -207,8 +207,11 @@ except Exception as e:
     web.quit()
     exit()
 
+titulos_xpath = "//span[starts-with(@id, 'tit-')]"
+botoes_xpath = "//button[@title='Renovar' or @title='Renew']"
 renovados = []
 nao_renovados = []
+processados = []
 
 try:
     SPINNER_XPATH = "(//div[@class='tabela'])[1]//div[@role='status']"
@@ -224,73 +227,80 @@ try:
         exit()
 
     print("Iniciando processamento de títulos...")
-    LINHAS_XPATH = "//span[starts-with(@id, 'tit-')]"  # cada livro visível
-    BOTOES_XPATH = "//button[@title='Renovar' or @title='Renew']"  # todos os botões de renovação
+    # Obtém a contagem inicial de livros
+    num_livros = len(web.find_elements(By.XPATH, titulos_xpath))
+    i = 0
+    while i < num_livros:
+        # Re-obter lista de títulos e botões em cada iteração
+        titulos = web.find_elements(By.XPATH, titulos_xpath)
+        botoes = web.find_elements(By.XPATH, botoes_xpath)
+        if i >= len(titulos) or i >= len(botoes):
+            print(f"⚠️ Sem botão correspondente para o índice {i}. Pulando...")
+            i += 1
+            continue
 
-    titulos = web.find_elements(By.XPATH, LINHAS_XPATH)
-    botoes = web.find_elements(By.XPATH, BOTOES_XPATH)
+        titulo_element = titulos[i]
+        titulo = titulo_element.text.strip() or "Título não identificado"
 
-    print(f"Encontrados {len(titulos)} títulos e {len(botoes)} botões de renovação.")
+        # Se já foi tentado, pula para o próximo
+        if titulo in processados:
+            print(f"ℹ️ '{titulo}' já processado. Pulando...")
+            i += 1
+            continue
 
-    if not titulos or not botoes:
-        sendemail("Nenhum livro foi renovado: não foram encontrados títulos ou botões 'Renovar'.")
-    else:
-        for i, titulo_element in enumerate(titulos):
-            titulo = titulo_element.text.strip() or "Título não identificado"
-            print(f"[{i + 1}] Tentando renovar: {titulo}")
+        print(f"[{i + 1}] Tentando renovar: {titulo}")
+        botao = botoes[i]
+        web.execute_script("arguments[0].scrollIntoView(true);", botao)
+        sleep(random.uniform(0.8, 1.2))
+        web.execute_script("arguments[0].click();", botao)
+        print(f"🖱️ Clicado em 'Renovar' para '{titulo}'.")
 
-            # Garante que o índice exista
-            if i >= len(botoes):
-                print(f"⚠️ Sem botão correspondente para '{titulo}'.")
-                nao_renovados.append((titulo, "Sem botão correspondente."))
-                continue
+        # Aguarda alerta de retorno
+        mensagem = ""
+        try:
+            alert_element = WebDriverWait(web, 10).until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
+            )
+            # espera preencher o texto do alerta
+            for _ in range(20):
+                mensagem = alert_element.text.strip()
+                if mensagem:
+                    break
+                sleep(0.1)
+        except TimeoutException:
+            print(f"❌ Nenhum alerta para '{titulo}'.")
+            nao_renovados.append((titulo, "Nenhum alerta após clique."))
+            processados.append(titulo)
+            i += 1  # avança para não ficar no mesmo índice
+            continue
 
-            botao = botoes[i]
+        if not mensagem:
+            mensagem = "[Alerta visível, mas sem texto]"
 
-            try:
-                web.execute_script("arguments[0].scrollIntoView(true);", botao)
-                sleep(random.uniform(0.8, 1.2))
-                web.execute_script("arguments[0].click();", botao)
-                print(f"🖱️ Clique no botão 'Renovar' executado para '{titulo}'.")
+        if "renovado com sucesso" in mensagem.lower():
+            print(f"✅ '{titulo}' renovado com sucesso!")
+            renovados.append(titulo)
+        else:
+            print(f"⚠️ '{titulo}' não pôde ser renovado: {mensagem}")
+            nao_renovados.append((titulo, mensagem))
 
-                # Espera o alerta aparecer
-                mensagem = ""
-                try:
-                    alert_element = WebDriverWait(web, 10).until(
-                        EC.visibility_of_element_located((By.CSS_SELECTOR, '[role=\"alert\"]'))
-                    )
-                    for _ in range(20):
-                        mensagem = alert_element.text.strip()
-                        if mensagem:
-                            break
-                        sleep(0.1)
-                except TimeoutException:
-                    print(f"❌ Nenhum alerta apareceu para '{titulo}'.")
-                    nao_renovados.append((titulo, "Nenhum alerta após clique."))
-                    continue
+        processados.append(titulo)
 
-                if not mensagem:
-                    mensagem = "[Alerta visível, mas sem texto]"
+        # Aguarda elemento ficar stale (linha atualizada/movida)
+        try:
+            WebDriverWait(web, 10).until(EC.staleness_of(titulo_element))
+        except:
+            print("⚠️ Alerta não sumiu ou elemento não ficou stale, prosseguindo...")
 
-                if "renovado com sucesso" in mensagem.lower():
-                    print(f"✅ '{titulo}' renovado com sucesso!")
-                    renovados.append(titulo)
-                else:
-                    print(f"⚠️ '{titulo}' não pôde ser renovado: {mensagem}")
-                    nao_renovados.append((titulo, mensagem))
+        # Se renovado com sucesso, o item foi movido para o fim da lista,
+        # então NÃO incrementamos 'i' para processar o próximo que ficou nesta posição.
+        # Se NÃO foi renovado, o item permaneceu e pulamos para o próximo.
+        if not mensagem.lower().startswith("renovado com sucesso"):
+            i += 1
 
-                # Espera o alerta sumir
-                try:
-                    WebDriverWait(web, 10).until(EC.staleness_of(alert_element))
-                except:
-                    print("Aviso: alerta não desapareceu, continuando...")
-
-            except Exception as e:
-                print(f"❌ Erro ao processar '{titulo}': {e}")
-                nao_renovados.append((titulo, f"Erro inesperado: {e}"))
-
-        msg = formatar_email(renovados, nao_renovados)
-        sendemail(msg)
+    # Após o loop, enviar e-mail com relatórios
+    msg = formatar_email(renovados, nao_renovados)
+    sendemail(msg)
 
 except Exception as e:
     print(f"Falha geral ao processar a página de pendências: {e}")
