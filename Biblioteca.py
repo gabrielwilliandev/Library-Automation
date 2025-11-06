@@ -259,7 +259,7 @@ try:
         mensagem = ""
         try:
             alert_element = WebDriverWait(web, 10).until(
-                EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
+                EC.visibility_of_element_located((By.CSS_SELECTOR, '[role=\"alert\"]'))
             )
             # espera preencher o texto do alerta
             for _ in range(20):
