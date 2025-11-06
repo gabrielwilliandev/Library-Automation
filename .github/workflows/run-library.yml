@@ -18,10 +18,24 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 📦 Instalar Google Chrome
+      - name: 🌎 Configurar idioma do sistema (pt_BR)
         run: |
           sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+          sudo apt-get install -y locales
+          sudo locale-gen pt_BR.UTF-8
+          echo "LANG=pt_BR.UTF-8" | sudo tee -a /etc/default/locale
+          echo "LANGUAGE=pt_BR:pt" | sudo tee -a /etc/default/locale
+          echo "LC_ALL=pt_BR.UTF-8" | sudo tee -a /etc/default/locale
+          export LANG=pt_BR.UTF-8
+          export LANGUAGE=pt_BR:pt
+          export LC_ALL=pt_BR.UTF-8
+          locale
+
+      - name: 📦 Instalar Google Chrome
+        run: |
+          sudo apt-get install -y google-chrome-stable || \
+          (wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+          sudo apt install -y ./google-chrome-stable_current_amd64.deb)
           google-chrome --version
 
       - name: 📦 Instalar dependências do Python
@@ -33,4 +47,8 @@ jobs:
         env:
           UCB_EMAIL: ${{ secrets.UCB_EMAIL }}
           UCB_PASS: ${{ secrets.UCB_PASS }}
+          LANG: pt_BR.UTF-8
+          LANGUAGE: pt_BR:pt
+          LC_ALL: pt_BR.UTF-8
+          CHROME_LANG: pt-BR
         run: python Biblioteca.py

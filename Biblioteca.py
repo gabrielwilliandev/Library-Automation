@@ -16,6 +16,8 @@ import random
 
 opcoes = webdriver.ChromeOptions()
 
+opcoes.add_argument("--lang=pt-BR")
+opcoes.add_argument("accept-language=pt-BR,pt")
 opcoes.add_argument(
     "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 
@@ -259,7 +261,7 @@ try:
         mensagem = ""
         try:
             alert_element = WebDriverWait(web, 10).until(
-                EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="alert"]'))
+                EC.visibility_of_element_located((By.CSS_SELECTOR, '[role=\"alert\"]'))
             )
             # espera preencher o texto do alerta
             for _ in range(20):
