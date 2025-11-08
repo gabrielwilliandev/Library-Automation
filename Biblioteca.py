@@ -3,7 +3,7 @@ import emoji
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from selenium import webdriver
-from selenium.common import WebDriverException, TimeoutException
+from selenium.common.exceptions import WebDriverException, TimeoutException
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
@@ -242,7 +242,15 @@ try:
             continue
 
         titulo_element = titulos[i]
-        titulo = titulo_element.text.strip() or "Título não identificado"
+
+        # Captura confiável do texto, mesmo em modo headless
+        try:
+            titulo = (titulo_element.get_attribute("textContent") or "").strip()
+        except Exception:
+            titulo = titulo_element.text.strip()
+
+        if not titulo:
+            titulo = "Título não identificado"
 
         # Se já foi tentado, pula para o próximo
         if titulo in processados:
