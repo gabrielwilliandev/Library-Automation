@@ -1,106 +1,133 @@
-# BoBot - Automação de Renovação de Livros do Pergamum 📚🤖
+# 📚 BoBot – Automação de Renovação de Livros (UCB)
 
-BoBot é um script em **Python** que automatiza a renovação de livros da plataforma **Pergamum** da UCB. Ele verifica se há títulos pendentes e tenta renová-los automaticamente. Ao final, envia um e-mail com o status da renovação. O script pode ser executado localmente ou via **GitHub Actions**, permitindo automação diária sem intervenção manual.
+Automatiza a renovação de livros na plataforma **Pergamum** da Universidade Católica de Brasília (UCB) e envia um relatório diário por e‑mail.  
+Pode ser executado **localmente** ou de forma **automática via GitHub Actions**.
 
 ---
 
-## 🚀 Funcionalidades
+## ⚙️ Funcionalidades
 
-* ✅ Verifica se existem livros com títulos pendentes
-* ✅ Realiza a renovação automática dos livros
-* ✅ Envia notificação por e-mail sobre o status da renovação
-* ✅ Suporta execução **local** ou via **GitHub Actions**
-* ✅ Executa em modo **headless** (Chrome sem interface gráfica) para automação segura
+- 🔑 Login automático na conta institucional (Microsoft)
+- 🔁 Renovação de todos os títulos pendentes
+- 📬 Envio de e‑mail com relatório de sucesso ou falha
+- 🤖 Execução automática agendada via GitHub Actions
+- 💻 Suporte para execução local (Windows / Linux / GitHub Runner)
 
 ---
 
 ## 🧰 Tecnologias utilizadas
 
-* Python 3.10+
-* Selenium
-* dotenv (para gerenciar credenciais)
-* emoji (para logs e e-mails)
-* smtplib / email.mime (para envio de e-mails)
-* GitHub Actions (para execução automática)
+- **Python 3.10+**
+- **Selenium WebDriver**
+- **python-dotenv**
+- **emoji**
+- **smtplib / email.mime**
+- **GitHub Actions**
 
----
 
-## ⚙️ Configuração
+## 🚀 Como configurar e usar
 
-### Instalar dependências
+### 1. 🧩 Instalar dependências (para rodar localmente)
+
+```bash
+pip install -r requirements.txt
+```
+
+Ou, manualmente:
 
 ```bash
 pip install selenium python-dotenv emoji webdriver-manager
 ```
 
-### Configurar variáveis de ambiente (execução local)
+---
 
-Crie um arquivo `.env` na raiz do projeto com:
+### 2. 🔐 Criar arquivo `.env` (modo local)
 
-```bash
-UCB_EMAIL=seu_email@ucb.com.br
+Na raiz do projeto, crie um arquivo chamado `.env` com o conteúdo:
+
+```
+UCB_EMAIL=seu_email@ucb.edu.br
 UCB_PASS=sua_senha
 ```
 
-> ⚠️ **Atenção:** As credenciais não devem ser versionadas. Se for usar no GitHub Actions, adicione-as como **Secrets** do repositório (`UCB_EMAIL` e `UCB_PASS`).
+> ⚠️ **Importante:** nunca suba este arquivo para o GitHub.  
+> O `.env` deve ser mantido apenas localmente.
 
 ---
 
-## 💻 Como rodar localmente
+### 3. ☁️ Configurar no GitHub Actions (modo automático)
 
-```bash
-python Biblioteca.py
+Se quiser que o processo rode automaticamente (sem abrir o programa manualmente), basta configurar o **workflow** do GitHub Actions.
+
+#### Passos:
+
+1. Faça **fork** ou **clone** deste repositório para sua conta.
+2. Vá em **Settings → Actions → General → Allow all actions** (ativar o Actions).
+3. Vá em **Settings → Secrets and variables → Actions → New repository secret**.
+4. Adicione os seguintes segredos:
+
+| Nome | Valor |
+|------|-------|
+| `UCB_EMAIL` | seu e‑mail institucional |
+| `UCB_PASS` | sua senha institucional |
+
+5. Vá na aba **Actions** → selecione o workflow → clique em **Run workflow** (para testar manualmente).
+
+Se tudo estiver certo, o GitHub rodará o bot e enviará o e‑mail de relatório.
+
+---
+
+## ⏰ Configurando a frequência de execução (cron)
+
+A automação usa o recurso de **agendamento (`cron`)** do GitHub Actions para definir **quando e com que frequência** o script será executado.
+
+Abra o arquivo:
+```
+.github/workflows/renovacao.yml
 ```
 
-O script realizará as seguintes ações:
-
-1. Acessa o site do Pergamum
-2. Realiza login com suas credenciais
-3. Verifica títulos pendentes
-4. Renova os livros automaticamente (se possível)
-5. Envia e-mail com o status da renovação
-
----
-
-## ☁️ Execução via GitHub Actions
-
-O script pode ser automatizado diariamente usando **GitHub Actions**. Um workflow funcional (`.github/workflows/renovacao.yml`)
-
-> 🕒 O GitHub Actions usa fuso **UTC**, então o cron `0 20 * * *` executa às **17:00 de Brasília**.
-
----
-
-## 🧱 Estrutura do projeto
-
-```plaintext
-.
-├── Biblioteca.py        # Script principal
-├── .env                 # Credenciais (não subir para o repositório)
-├── README.md            # Este arquivo
-└── .github/workflows/   # Workflow do GitHub Actions
+Localize o trecho:
+```yaml
+on:
+  schedule:
+    - cron: '0 11 * * *'  # Executa todos os dias às 8h (horário de Brasília)
+  workflow_dispatch:
 ```
 
+### ✏️ Como funciona o `cron`
+Formato:
+```
+minuto hora dia-do-mês mês dia-da-semana
+```
+O GitHub Actions usa **UTC** (3 horas à frente de Brasília).  
+Então, para 8h da manhã em Brasília → use **11h UTC**.
+
 ---
 
-## 🧾 Logs e mensagens possíveis
+### 📅 Exemplos de configuração
 
-* `Nenhum título pendente encontrado` → Nenhum livro disponível para renovação
-* `Livro renovado com sucesso` → Renovação concluída com êxito
-* `Não foi possível renovar` → O limite de renovações pode ter sido atingido
-* `Erro de login` → Credenciais incorretas ou instabilidade do site
+| Frequência desejada | Cron | Explicação |
+|----------------------|------|-------------|
+| 🕗 Todos os dias às 8h (Brasília) | `'0 11 * * *'` | Execução diária |
+| 📘 A cada 3 dias às 8h (Brasília) | `'0 11 */3 * *'` | A cada 3 dias |
+| 📗 1x por semana (segunda‑feira, 8h Brasília) | `'0 11 * * 1'` | Segunda‑feira |
+| 📕 1º e 15º de cada mês | `'0 11 1,15 * *'` | Duas vezes por mês |
+| 📙 Uma vez por mês (dia 1) | `'0 11 1 * *'` | Mensalmente |
+
 
 ---
 
-## 💡 Dicas e observações
+## 📬 Relatório por e‑mail
 
-* O script roda em **modo headless**, sem interface gráfica.
-* No GitHub Actions, o Chrome é instalado automaticamente.
-* O idioma e tamanho da janela são configurados via opções `--lang=pt-BR` e `--window-size=1920,1080`.
-* Utilize `webdriver-manager` para garantir compatibilidade entre Chrome e ChromeDriver.
-* A UCB exige renovação constante da senha do email universitário, ao atualizar a senha, atualize a senha nos Secrets ou no .env.
+Após cada execução, o bot envia um e‑mail para o endereço configurado contendo:
+- ✅ Livros renovados com sucesso  
+- ❌ Livros que não puderam ser renovados  
+- 📅 Data e hora da execução
+
 ---
 
 ## 👨‍💻 Autor
 
-Desenvolvido por **Gabriel Willian** 🤖
-Sugestões e melhorias são bem-vindas! Abra uma *issue* no repositório ou envie um *pull request*.
+**Gabriel Willian**  
+Desenvolvido para automatizar a rotina de renovação da biblioteca da UCB.  
+Contribuições e melhorias são bem‑vindas!
